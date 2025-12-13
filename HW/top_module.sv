@@ -14,51 +14,51 @@ module top_module #(
     input  logic                           clk,
     input  logic                           rst,
     input  logic                           ce,
-    input  logic [NUM_FEATURES-1:0][N-1:0][PRECISION-1:0] features,
-    output logic [NUM_FEATURES-1:0][M-1:0][PRECISION-1:0] out 
+    input  logic [PRECISION-1:0] features [NUM_FEATURES][N],
+    output logic [PRECISION-1:0] out [NUM_FEATURES][N]
 );
 
-    localparam int BRAM_WIDTH = WIDTH*N+WIDTH_B;
+    localparam int BramWidth = WIDTH*N+WIDTH_B;
 
     typedef enum logic {
         IDLE,
         RUNNING,
         OUT
-    } t_state;
-     
-    t_state state;
+    } state_t;
 
-    logic [NUM_FEATURES-1:0][N-1:0][PRECISION-1:0] latched_features,
-    
-    logic [NUM_FEATURES-1:0][M-1:0][WIDTH_B-1:0]   acc ;
-    logic [NUM_FEATURES-1:0][WIDTH_B-1:0]          ai ;
-    
-    always_ff @(posedge clk or posedge rst) begin    
+    state_t state;
+
+    logic [PRECISION-1:0] latched_features [NUM_FEATURES][N];
+
+    logic [WIDTH_B-1:0] acc [NUM_FEATURES][M];
+    logic [WIDTH_B-1:0] ai [NUM_FEATURES];
+
+    always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
             state <= IDLE;
         end else begin
-            case(state)
+            unique case(state)
                 IDLE: begin
-                    in_ready = 1;
+                    in_ready <= 1;
                     if (in_valid)  begin
-                        latched_features = features;
-                        state = RUNNING;
+                        latched_features <= features;
+                        state <= RUNNING;
                     end
                 end
-                
+
                 RUNNING: begin
-                    in_ready = 0;
+                    in_ready <= 0;
                     // HW team;
-                end  
-                
+                end
+
                 OUT: begin
-                    out_valid = 1;
+                    out_valid <= 1;
                     if (out_ready) begin
-                        state = IDLE;
+                        state <= IDLE;
                     end
-                end  
+                end
             endcase;
          end
       end
-            
+
 endmodule

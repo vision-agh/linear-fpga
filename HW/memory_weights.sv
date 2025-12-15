@@ -13,7 +13,7 @@ module memory_weights #(
     (* ram_style = RAM_TYPE *) logic [DATA_WIDTH-1:0] mem[ADDR_DEPTH-1:0] = '{default:0};
     
     initial begin
-        $readmemh("mem_init.mem", mem);
+        $readmemh("memory_file.mem", mem);
     end
 
     always_ff @(posedge clk) begin

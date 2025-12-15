@@ -15,7 +15,7 @@ module top_module #(
     input  logic                           rst,
     input  logic                           ce,
     input  logic [PRECISION-1:0] features [NUM_FEATURES][N],
-    output logic [PRECISION-1:0] out [NUM_FEATURES][N]
+    output logic [PRECISION-1:0] out [NUM_FEATURES][M]
 );
 
     localparam int BramWidth = WIDTH*N+WIDTH_B;

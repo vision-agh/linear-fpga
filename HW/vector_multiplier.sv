@@ -1,20 +1,20 @@
 `timescale 1ns / 1ps
 
 module vector_multiplier #(
-    parameter int REG_DEPTH = 8,
-    parameter int NP        = 1      
+    parameter int PRECISION = 8,
+    parameter int NUM_FEATURES = 1      
 ) (
     input  logic                         clk,
     input  logic                         rst,
     input  logic                         ce, //Przemyśleć
-    input  logic [NP-1:0][REG_DEPTH-1:0] features_in,  
-    input  logic [NP-1:0][REG_DEPTH-1:0] weights_in,    
+    input  logic [NUM_FEATURES-1:0][PRECISION-1:0] features_in,  
+    input  logic [NUM_FEATURES-1:0][PRECISION-1:0] weights_in,    
     output logic [31:0]                  acc,
     output logic [31:0]                  ai
 );
     
-    logic [NP-1:0][REG_DEPTH-1:0] r_features_in;
-    logic [NP-1:0][REG_DEPTH-1:0] r_weights_in;
+    logic [NUM_FEATURES-1:0][PRECISION-1:0] r_features_in;
+    logic [NUM_FEATURES-1:0][PRECISION-1:0] r_weights_in;
 
     logic [31:0] r_acc;
     logic [31:0] r_ai; 
@@ -24,12 +24,12 @@ module vector_multiplier #(
     
     always_ff @ (posedge clk) begin
         if(rst) begin
-            r_features_in  <= 0;
-            r_weights_in   <= 0;
+            acc  <= 0;
+            ai   <= 0;
         end
         else begin
-            r_features_in  <= features_in;
-            r_weights_in   <= weights_in;
+            acc  <= n_acc;
+            ai   <= n_ai;
         end
     end
         
@@ -37,9 +37,9 @@ module vector_multiplier #(
         if(ce) begin
             n_acc = 0;
             n_ai  = 0;
-            for(int i=0; i<NP; i++) begin
-                n_acc += r_features_in[i] * r_weights_in[i];
-                n_ai  += r_features_in[i];
+            for(int i=0; i<NUM_FEATURES; i++) begin
+                n_acc += features_in[i] * weights_in[i];
+                n_ai  += features_in[i];
             end
         end
         else begin
@@ -47,8 +47,6 @@ module vector_multiplier #(
             n_ai  <= n_ai;
         end
     end
-    
-    assign acc = n_ai;
-    assign ai  = n_acc;
+
 
 endmodule

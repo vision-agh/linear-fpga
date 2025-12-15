@@ -40,21 +40,22 @@ module top_module #(
             unique case(state)
                 IDLE: begin
                     in_ready <= 1;
-                    if (in_valid)  begin
+                    if (in_valid && in_ready)  begin
                         latched_features <= features;
                         state <= RUNNING;
+                        in_ready <= 0;
                     end
                 end
 
                 RUNNING: begin
-                    in_ready <= 0;
                     // HW team;
                 end
 
                 OUT: begin
                     out_valid <= 1;
-                    if (out_ready) begin
+                    if (out_ready && out_valid) begin
                         state <= IDLE;
+                        out_valid <= 0;
                     end
                 end
             endcase;

@@ -1,0 +1,7 @@
+.nvim/
+venv/
+.venv/
+env/
+*.txt
+!requirements.txt
+!params.txt

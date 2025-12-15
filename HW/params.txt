@@ -1,0 +1,8 @@
+parameter int PRECISION   = 8;
+parameter int BIAS_PRECISION = 32;
+parameter int NUM_FEATURES = 2;
+parameter int N = 10;
+parameter int M = 12;
+parameter int  M_MUL = 12345;
+parameter int  Z_WEIGHTS = 5;
+parameter int NUM_EXAMPLES = 1;

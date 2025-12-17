@@ -1,26 +1,24 @@
 `timescale 1ns / 1ps
 
 module vector_multiplier #(
-    parameter int PRECISION = 8,
-    parameter int NUM_FEATURES = 1      
+    parameter int PRECISION      = 8,
+    parameter int NUM_FEATURES   = 1,
+    parameter int BIAS_PRECISION = 32    
 ) (
-    input  logic                         clk,
-    input  logic                         rst,
-    input  logic                         ce, //Przemyśleć
-    input  logic [NUM_FEATURES-1:0][PRECISION-1:0] features_in,  
-    input  logic [NUM_FEATURES-1:0][PRECISION-1:0] weights_in,    
-    output logic [31:0]                  acc,
-    output logic [31:0]                  ai
+    input  logic                 clk,
+    input  logic                 rst,
+    input  logic                 ce,
+    input  logic [PRECISION-1:0] features_in [NUM_FEATURES-1:0],  
+    input  logic [PRECISION-1:0] weights_in  [NUM_FEATURES-1:0],    
+    output logic [BIAS_PRECISION-1:0]                acc,
+    output logic [BIAS_PRECISION-1:0]                ai
 );
-    
-    logic [NUM_FEATURES-1:0][PRECISION-1:0] r_features_in;
-    logic [NUM_FEATURES-1:0][PRECISION-1:0] r_weights_in;
 
-    logic [31:0] r_acc;
-    logic [31:0] r_ai; 
+    logic [BIAS_PRECISION-1:0] r_acc;
+    logic [BIAS_PRECISION-1:0] r_ai; 
     
-    logic [31:0] n_acc;
-    logic [31:0] n_ai;
+    logic [BIAS_PRECISION-1:0] n_acc;
+    logic [BIAS_PRECISION-1:0] n_ai;
     
     always_ff @ (posedge clk) begin
         if(rst) begin
@@ -43,8 +41,8 @@ module vector_multiplier #(
             end
         end
         else begin
-            n_acc <= n_acc;
-            n_ai  <= n_ai;
+            n_acc = n_acc;
+            n_ai  = n_ai;
         end
     end
 

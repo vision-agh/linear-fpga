@@ -9,37 +9,46 @@ module tb_memory_fetcher;
     localparam int PRECISION      = 8;
 
     logic                        clk;
-    logic                        rst;
+    logic                        clr;
     logic                        ce;
-    logic [N-1:0][PRECISION-1:0] data_out;
+    logic [PRECISION-1:0]        data_out [N-1:0];
     logic [BIAS_PRECISION-1:0]   bias;
     logic                        in_ready;
 
     memory_fetcher #(
-        .BRAM_WIDTH     ( BRAM_WIDTH ),
-        .M              ( M ),
-        .N              ( N ),
+        .BRAM_WIDTH     ( BRAM_WIDTH     ),
+        .M              ( M              ),
+        .N              ( N              ),
         .BIAS_PRECISION ( BIAS_PRECISION ),
-        .PRECISION      ( PRECISION )
+        .PRECISION      ( PRECISION      )
     ) dut (
-        .clk      ( clk ),
-        .rst      ( rst ),
-        .ce       ( ce ),
-        .data_out ( data_out ),
-        .bias     ( bias ),
-        .in_ready ( in_ready )
+        .clk            ( clk            ),
+        .clr            ( clr            ),
+        .ce             ( ce             ),
+        .data_out       ( data_out       ),
+        .bias           ( bias           ),
+        .in_ready       ( in_ready       )
     );
 
     initial clk = 0;
     always #5 clk = ~clk;
 
     initial begin
-        rst = 1;
+        clr = 1;
         ce  = 0;
-        #20;
-        rst = 0;
+        repeat (4) @(posedge clk);
+        clr = 0;
         ce  = 1;
         repeat (20) @(posedge clk);
+        clr = 1;
+        repeat (1) @(posedge clk);
+        clr = 0;
+        repeat (10) @(posedge clk);
+        clr = 1;
+        repeat (1) @(posedge clk);
+        clr = 0;
+        
+        repeat (10) @(posedge clk);
         $finish;
     end
 

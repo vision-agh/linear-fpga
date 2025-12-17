@@ -3,15 +3,15 @@
 
 module burst_buffer #(
     parameter int INITIAL_LATENCY = 3,
-    parameter int M = 5,
-    parameter int PRECISION = 5
+    parameter int M               = 5,
+    parameter int PRECISION       = 5
 ) (
-    input  logic                        clk,
-    input  logic                        rst,
-    input  logic                        ce,
-    input  logic [PRECISION-1:0]        data_in,
-    output logic [M-1:0][PRECISION-1:0] data_out,
-    output logic out_ready // temporary signal
+    input  logic                 clk,
+    input  logic                 clr,
+    input  logic                 ce,
+    input  logic [PRECISION-1:0] data_in,
+    output logic [PRECISION-1:0] data_out [M-1:0],
+    output logic burst_complete 
 );
     
     typedef enum logic {
@@ -21,15 +21,15 @@ module burst_buffer #(
 
     state_t state = LATENCY;
     
-    logic [3:0]   count;
-    logic [M-1:0][PRECISION-1:0] r_burst_buffer;
+    logic [$clog2(INITIAL_LATENCY):0]   count;
+    logic [PRECISION-1:0] r_burst_buffer [M] ;
     
     always_ff @ (posedge clk) begin
-        if (rst) begin
+        if (clr) begin
             count          <= 0;
-            r_burst_buffer <= 0;
-            data_out       <= 0;
-            out_ready      <= 0;
+            r_burst_buffer <= '{default:0};
+            //data_out       <= '{default:0};
+            burst_complete      <= 0;
             state          <= LATENCY;
         end else begin
             if (ce) begin
@@ -46,14 +46,13 @@ module burst_buffer #(
                     BUFFERING: begin
                         state <= BUFFERING;
                         if (count < M) begin
-                            out_ready <= 0;
-                            r_burst_buffer[M-1-count] <= data_in;
+                            burst_complete <= 0;
+                            r_burst_buffer[count] <= data_in;
                             count <= count + 1;
                         end else begin
-                            count <= 1;
                             data_out  <= r_burst_buffer;
-                            r_burst_buffer[M-1] <= data_in;
-                            out_ready <= 1;
+                            //r_burst_buffer[M-1] <= data_in;
+                            burst_complete <= 1;
                         end
                     end
                  endcase

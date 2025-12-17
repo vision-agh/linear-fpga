@@ -6,15 +6,15 @@ module accumulator #(
 ) (
     input  logic clk,
     input  logic rst,
-    input  logic ce, //Przemyśleć
-    input  logic [MUL_PER_FEATURE - 1 : 0][BIAS_PRECISION - 1:0] data_in_A,  
-    input  logic [MUL_PER_FEATURE - 1 : 0][BIAS_PRECISION - 1:0] data_in_B,     
-    output logic [BIAS_PRECISION - 1 : 0] data_out_A,
-    output logic [BIAS_PRECISION - 1 : 0] data_out_B
+    input  logic ce,
+    input  logic [BIAS_PRECISION-1:0] data_in_A [MUL_PER_FEATURE],  
+    input  logic [BIAS_PRECISION-1:0] data_in_B [MUL_PER_FEATURE],     
+    output logic [BIAS_PRECISION-1:0] data_out_A,
+    output logic [BIAS_PRECISION-1:0] data_out_B
 );
 
-    logic [BIAS_PRECISION - 1 : 0] n_data_out_A;
-    logic [BIAS_PRECISION - 1 : 0] n_data_out_B;
+    logic [BIAS_PRECISION-1:0] n_data_out_A;
+    logic [BIAS_PRECISION-1:0] n_data_out_B;
 
     always_ff @(posedge clk) begin 
         if (rst) begin

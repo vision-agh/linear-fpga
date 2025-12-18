@@ -88,13 +88,21 @@ def generate_data(N, M, save_to_file=None):
 # ============================================================================
 
 def quantize_all(weights, biases, input_data,
-                 weight_bits=8, input_bits=8, output_bits=8, bias_bits=32):
+                 weight_bits=8, input_bits=8, output_bits=8, bias_bits=32, save_weights=False):
     """
     Kwantyzuje wagi, wejście i zwraca parametry dla biasów i wyjścia.
     """
     # 1. Kwantyzacja wag
     q_weights, S_w, Z_w = quantize(weights, bits=weight_bits)
-
+    
+    # zapis do .mem w hex                  
+    if save_weights:
+        with open(".\\mem", "w") as f:
+            for val in q_weights:
+                f.write(f"{val:02X}\n")
+        
+        print(f"Zapisan wagi w hex")
+        
     # 2. Kwantyzacja wejścia
     q_input, S_in, Z_in = quantize(input_data, bits=input_bits)
 
@@ -288,3 +296,4 @@ if __name__ == "__main__":
         print("\nKwantyzacja działa poprawnie!")
     else:
         print("\nBłąd większy niż oczekiwany (>1.5%)")
+

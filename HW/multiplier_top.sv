@@ -16,11 +16,13 @@ module multiplier_top #(
     input  logic [BIAS_PRECISION-1:0] bias,     
     input  logic [PRECISION-1:0]      weights_in [N-1:0],
     input  logic [PRECISION-1:0]      features   [NUM_FEATURES-1:0][N-1:0],
-    output logic [PRECISION-1:0]      out        [NUM_FEATURES-1:0]
+    output logic [PRECISION-1:0]      out        [NUM_FEATURES-1:0],
+    output logic [BIAS_PRECISION-1:0] long_out   [NUM_FEATURES-1:0] 
 );
 
-    localparam int DELAY_FEATURES = 1;
-    localparam int DELAY_BIAS = 1;
+    localparam int DELAY_FEATURES = 1; //when temp < 0 == 2,  temp > 1 == 1
+    localparam int DELAY_BIAS = 2; //when temp < 0 == 1 ;; temp > 1 == 2 ;; temp == 1 == 2
+    localparam int WEIGHT_BIAS = 0; // when temp > 1 == 0 ;; temp = 1 == 0
     
     logic [BIAS_PRECISION-1:0] acc_sliced [NUM_FEATURES-1:0][MUL_PER_FEATURE-1:0];
     logic [BIAS_PRECISION-1:0] ai_sliced  [NUM_FEATURES-1:0][MUL_PER_FEATURE-1:0];
@@ -30,6 +32,9 @@ module multiplier_top #(
     
     logic [PRECISION-1:0]      d_features [NUM_FEATURES-1:0][N-1:0];
     logic [BIAS_PRECISION-1:0] d_bias;
+    logic [PRECISION-1:0]      d_weights_in [N-1:0];
+    
+    logic [BIAS_PRECISION-1:0] long_out        [NUM_FEATURES-1:0];
     
     genvar i;
     
@@ -46,11 +51,22 @@ module multiplier_top #(
     
     delay_buffer_0d #(
         .PRECISION ( BIAS_PRECISION ),
-        .DELAY     ( DELAY_BIAS     )
+        .DELAY     ( DELAY_BIAS     ),
+        .N         ( N              )
     ) u_delay_buffer_0d (
         .clk   ( clk    ),
         .idata ( bias   ),
         .odata ( d_bias )
+    );
+    
+    delay_buffer_1d #(
+        .PRECISION ( PRECISION ),
+        .DELAY     ( WEIGHT_BIAS ),
+        .N         ( N           )
+    ) u_delay_buffer_1d (
+        .clk   ( clk    ),
+        .idata ( weights_in   ),
+        .odata ( d_weights_in )
     );
 
     for(i=0; i<NUM_FEATURES; i++) begin
@@ -64,7 +80,7 @@ module multiplier_top #(
             .rst         ( rst           ),
             .ce          ( ce            ),
             .features_in ( d_features[i] ),
-            .weights_in  ( weights_in    ),
+            .weights_in  ( d_weights_in    ),
             .acc         ( acc_sliced[i] ),
             .ai          ( ai_sliced[i]  )
         );
@@ -93,13 +109,14 @@ module multiplier_top #(
             .BIAS_PRECISION         ( BIAS_PRECISION         ),
             .OUTPUT_STAGE_PRECISION ( OUTPUT_STAGE_PRECISION )
         ) u_output_stage (
-            .clk   ( clk    ),
-            .rst   ( rst    ),
-            .ce    ( ce     ),
-            .ai    ( ai[i]  ),
-            .acc   ( acc[i] ),
-            .bias  ( d_bias ),
-            .out   ( out[i] )
+            .clk      ( clk    ),
+            .rst      ( rst    ),
+            .ce       ( ce     ),
+            .ai       ( ai[i]  ),
+            .acc      ( acc[i] ),
+            .bias     ( d_bias ),
+            .out      ( out[i] ),
+            .long_out ( long_out[i] )
         );
     end
 

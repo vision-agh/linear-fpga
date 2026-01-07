@@ -21,7 +21,7 @@ module burst_buffer #(
 
     state_t state = LATENCY;
     
-    logic [$clog2(INITIAL_LATENCY):0]   count;
+    logic [$clog2(M + INITIAL_LATENCY):0]   count;
     logic [PRECISION-1:0] r_burst_buffer [M] ;
     
     always_ff @ (posedge clk) begin

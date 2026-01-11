@@ -21,8 +21,8 @@ module top_module #(
     input  logic [PRECISION-1:0] features [NUM_FEATURES-1:0][N-1:0],
     output logic [PRECISION-1:0] out      [NUM_FEATURES-1:0][M-1:0]
 );
-
-    localparam int INITIAL_LATENCY = 5; // latency needed for burst_buffer to skip thrash data, TEMP < 0 == 6, TEMP > 1 == 4, TEMP =1 == 5
+    
+localparam int INITIAL_LATENCY = (TEMP < 0) ? 5 : (TEMP == 1) ? 5 : 4;
     
     logic memory_clr;
     logic buffer_clr;
@@ -84,6 +84,7 @@ module top_module #(
         );
             
         multiplier_top #(
+            .TEMP                   ( TEMP             ),
             .PRECISION              ( PRECISION        ),
             .BIAS_PRECISION         ( BIAS_PRECISION   ),
             .OUTPUT_STAGE_PRECISION ( BIAS_PRECISION*2 ),
@@ -154,6 +155,7 @@ module top_module #(
         );
         
         multiplier_top #(
+            .TEMP                   ( TEMP           ),
             .PRECISION              ( PRECISION        ),
             .BIAS_PRECISION         ( BIAS_PRECISION   ),
             .OUTPUT_STAGE_PRECISION ( BIAS_PRECISION*2 ),
@@ -212,6 +214,7 @@ module top_module #(
         genvar i, j;
             for(i=0; i<TEMP; i++) begin 
                  multiplier_top #(
+                    .TEMP                   ( TEMP             ),
                     .PRECISION              ( PRECISION        ),
                     .BIAS_PRECISION         ( BIAS_PRECISION   ),
                     .OUTPUT_STAGE_PRECISION ( BIAS_PRECISION*2 ),

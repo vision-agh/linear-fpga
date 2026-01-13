@@ -4,7 +4,7 @@ import numpy as np
 def toBin(num, prec):
     assert isinstance(num, np.integer)
     num = int(num)
-    binary = list(bin(num)[2:])
+    binary = list(bin(num & (2**prec-1))[2:])
     assert len(binary) <= prec
     return "".join((["0" for i in range(prec)] + binary)[-prec:])
 
@@ -13,7 +13,7 @@ def toHex(num, prec):
     assert isinstance(num, np.integer)
     num = int(num)
     leng = prec // 4 if prec // 4 == prec / 4 else prec // 4 + 1
-    binary = list(hex(num)[2:])
+    binary = list(hex(num & (2**prec-1))[2:])
     assert len(binary) <= leng
     return "".join((["0" for i in range(leng)] + binary)[-leng:])
 

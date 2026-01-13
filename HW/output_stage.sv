@@ -32,9 +32,9 @@ module output_stage #(
     
     always_comb begin
         if(ce) begin
-            n_out = (acc - Z_WEIGHTS*ai)*M_MUL;
+            n_out = ($signed(acc) - $signed(Z_WEIGHTS)*$signed(ai))*$signed(M_MUL);
             n_out = (n_out>>>32);
-            n_out = n_out + bias;
+            n_out = n_out + $signed(bias);
         end
         else begin
             n_out <= n_out;

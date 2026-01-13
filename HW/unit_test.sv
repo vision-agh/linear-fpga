@@ -1,8 +1,17 @@
 module unit_test (
 );
 
-`include "params.txt"
-
+//`include "params.txt"
+localparam int TEMP           = 1;
+localparam int NUM_EXAMPLES   = 1;
+localparam int PRECISION      = 8;
+localparam int BIAS_PRECISION = 32;
+localparam int NUM_FEATURES   = 1;
+localparam int MUL_PER_FEATURE= 4;
+localparam int N              = 8;
+localparam int M              = 8;
+localparam int M_MUL          = 58948426;
+localparam int Z_WEIGHTS      = 109;
 
 logic [PRECISION-1:0] raw_examples [N*NUM_FEATURES*NUM_EXAMPLES];
 logic [PRECISION-1:0] examples [NUM_EXAMPLES][NUM_FEATURES][N];
@@ -11,12 +20,12 @@ logic [PRECISION-1:0] out [NUM_FEATURES][M];
 logic [PRECISION-1:0] latched_out [NUM_FEATURES][M];
 logic clk = 1;
 logic ce = 1;
-logic rst = 0;
+logic rst = 1;
 
 integer ex, fea, n, i;
 
 initial begin
-  $readmemh("features.bin", raw_examples);
+  $readmemh("features.txt", raw_examples);
   // unflatten
   for (i = 0; i < NUM_EXAMPLES*NUM_FEATURES*N; i = i + 1) begin
       ex = i / (NUM_FEATURES * N);
@@ -34,6 +43,7 @@ logic in_ready;
 logic in_valid = 0;
 
 top_module #(
+  .TEMP(TEMP),
   .PRECISION(PRECISION),
   .BIAS_PRECISION(BIAS_PRECISION),
   .NUM_FEATURES(NUM_FEATURES),
@@ -54,7 +64,7 @@ top_module #(
     .out(out)
 );
 
-typedef enum logic {
+typedef enum logic [3:0] {
   LOAD,
   SEND,
   RECEIVE,
@@ -65,7 +75,7 @@ typedef enum logic {
 state_t stan = LOAD;
 logic [31:0] index = 0;
 
-logic [8*64:1] filename; // 64-char filename buffer
+string filename; // 64-char filename buffer
 integer file;
 integer f, m;
 
@@ -74,6 +84,7 @@ always_ff @(posedge clk) begin : StateMachine
     LOAD: begin
       if (index < NUM_EXAMPLES) begin
         features <= examples[index];
+        rst <= 0;
         stan <= SEND;
         index += 1;
       end else begin
@@ -105,7 +116,7 @@ always_ff @(posedge clk) begin : StateMachine
         // Write latched_out to file
         for (int f = 0; f < NUM_FEATURES; f++) begin
           for (int m = 0; m < M; m++) begin
-            $fwrite(file, "%0b\n", latched_out[f][m]);
+            $fwrite(file, "%0d\n", latched_out[f][m]);
           end
         end
         $fclose(file);

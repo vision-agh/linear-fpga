@@ -21,9 +21,9 @@ module multiplier_top #(
     output logic [BIAS_PRECISION-1:0] long_out   [NUM_FEATURES-1:0] 
 );
 
-    localparam int DELAY_FEATURES = (TEMP < 0) ? 0 : (TEMP == 1) ? 1 : 1; //when temp < 0 == 2,  temp > 1 == 1
+    localparam int DELAY_FEATURES = (TEMP < 0) ? 1 : (TEMP == 1) ? 1 : 1; //when temp < 0 == 2,  temp > 1 == 1
     localparam int DELAY_BIAS     = (TEMP < 0) ? 2 : (TEMP == 1) ? 2 : 2; //when temp < 0 == 1 ;; temp > 1 == 2 ;; temp == 1 == 2
-    localparam int WEIGHT_BIAS    = (TEMP < 0) ? 0 : (TEMP == 1) ? 0 : 0; // when temp > 1 == 0 ;; temp = 1 == 0
+    localparam int DELAY_WEIGHT   = (TEMP < 0) ? 0 : (TEMP == 1) ? 0 : 0; // when temp > 1 == 0 ;; temp = 1 == 0
     
     logic [BIAS_PRECISION-1:0] acc_sliced [NUM_FEATURES-1:0][MUL_PER_FEATURE-1:0];
     logic [BIAS_PRECISION-1:0] ai_sliced  [NUM_FEATURES-1:0][MUL_PER_FEATURE-1:0];
@@ -61,8 +61,8 @@ module multiplier_top #(
     );
     
     delay_buffer_1d #(
-        .PRECISION ( PRECISION ),
-        .DELAY     ( WEIGHT_BIAS ),
+        .PRECISION ( PRECISION    ),
+        .DELAY     ( DELAY_WEIGHT ),
         .N         ( N           )
     ) u_delay_buffer_1d (
         .clk   ( clk    ),

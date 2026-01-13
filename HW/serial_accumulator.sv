@@ -25,7 +25,7 @@ module serial_accumulator #(
     state_t state = LATENCY;
 
     logic [$clog2(INITIAL_LATENCY):0] count = 0;
-    logic [$clog2(M):0] bucket_count = 0;
+    logic [$clog2(M)+1:0] bucket_count = 0;
     logic [$clog2(TEMP):0] segment_count = 0;
     logic [BIAS_PRECISION-1:0] accumulator [NUM_FEATURES-1:0][M-1:0];
     

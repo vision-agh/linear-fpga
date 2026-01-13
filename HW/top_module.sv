@@ -1,6 +1,6 @@
-module top_module #(
-    parameter int PRECISION       = 8,
+ module top_module #(
     parameter int TEMP            = 1,
+    parameter int PRECISION       = 8,
     parameter int BIAS_PRECISION  = 32,
     parameter int NUM_FEATURES    = 2,          // number of parallel features
     parameter int MUL_PER_FEATURE = 2,          // number of multiplier instantiations per feature
@@ -13,8 +13,6 @@ module top_module #(
     output logic                 in_ready,
     input  logic                 in_valid,
     input  logic                 out_ready,
-    input  logic                 buffer_clr,
-    input  logic                 memory_clr,
     input  logic                 clk,
     input  logic                 rst,
     input  logic                 ce,
@@ -22,26 +20,19 @@ module top_module #(
     output logic [PRECISION-1:0] out      [NUM_FEATURES-1:0][M-1:0]
 );
     
-localparam int INITIAL_LATENCY = (TEMP < 0) ? 5 : (TEMP == 1) ? 5 : 4;
+    localparam int INITIAL_LATENCY = (TEMP < 0) ? 5 : (TEMP == 1) ? 5 : 5;
     
     logic memory_clr;
     logic buffer_clr;
     logic burst_complete;
-    logic buffer_clr_ser=0;
     
-    logic [PRECISION-1:0] weights_in       [N-1:0];
-    logic [PRECISION-1:0] features_sliced  [NUM_FEATURES-1:0][N/TEMP-1:0];
+    logic [PRECISION-1:0] features_sliced  [NUM_FEATURES-1:0][N/(-TEMP)-1:0];
     logic [PRECISION-1:0] latched_features [NUM_FEATURES-1:0][N-1:0];
     logic [PRECISION-1:0] weights [N-1:0];
 
     
-    logic [PRECISION-1:0] r_out_mult    [NUM_FEATURES-1:0];
-    logic [PRECISION-1:0] r_out_top_sin [NUM_FEATURES-1:0][M-1:0];
-    logic [PRECISION-1:0] r_out_top     [NUM_FEATURES-1:0][TEMP-1:0][(M/TEMP)-1:0];
-    logic [PRECISION-1:0] r_out_top_ser [NUM_FEATURES-1:0][M-1:0];
-    logic [BIAS_PRECISION-1:0] r_out_long    [NUM_FEATURES-1:0];
-
-    logic [PRECISION-1:0] r_out_buffer [NUM_FEATURES-1:0][M-1:0];
+    logic [PRECISION-1:0] r_out_top_parallel [NUM_FEATURES-1:0][TEMP-1:0][(M/TEMP)-1:0];
+    logic [PRECISION-1:0] r_out_buffer       [NUM_FEATURES-1:0][M-1:0];
     
     logic [PRECISION-1:0] weights_serial   [N/(-TEMP)-1:0];
     logic [PRECISION-1:0] weights_single   [N-1:0];
@@ -50,8 +41,9 @@ localparam int INITIAL_LATENCY = (TEMP < 0) ? 5 : (TEMP == 1) ? 5 : 4;
     logic [BIAS_PRECISION-1:0] bias_parallel [TEMP-1:0];
     logic [BIAS_PRECISION-1:0] bias;
     
+    logic [PRECISION-1:0] r_out_mult    [NUM_FEATURES-1:0];
+    logic [BIAS_PRECISION-1:0] r_out_mult_serial   [NUM_FEATURES-1:0]; // 
     logic [PRECISION-1:0] r_out_mult_parallel [TEMP-1:0][NUM_FEATURES-1:0];
-    logic [PRECISION-1:0] r_out_mult_serial   [NUM_FEATURES-1:0];
 
 
     typedef enum logic [1:0] {
@@ -60,7 +52,7 @@ localparam int INITIAL_LATENCY = (TEMP < 0) ? 5 : (TEMP == 1) ? 5 : 4;
         OUT
     } state_t;
 
-    state_t state;
+    state_t state = IDLE;
     
     generate
     if (TEMP < 0) begin
@@ -100,8 +92,8 @@ localparam int INITIAL_LATENCY = (TEMP < 0) ? 5 : (TEMP == 1) ? 5 : 4;
             .bias       ( bias              ),     
             .weights_in ( weights_serial    ),
             .features   ( features_sliced   ),
-            .out        ( r_out_mult_serial ),
-            .long_out   ( r_out_long        )
+            .out        (                   ),
+            .long_out   ( r_out_mult_serial )
         );
        
          serial_accumulator #(
@@ -112,13 +104,13 @@ localparam int INITIAL_LATENCY = (TEMP < 0) ? 5 : (TEMP == 1) ? 5 : 4;
             .NUM_FEATURES           ( NUM_FEATURES     ),
             .M                      ( M                )
          ) u_serial_accumulator (
-            .clk      ( clk            ),
-            .rst      ( rst            ),
-            .clr      ( buffer_clr     ),
-            .ce       ( ce             ),
-            .features ( r_out_long     ),
-            .out      ( r_out_buffer   ),
-            .acc_done ( burst_complete )
+            .clk      ( clk               ),
+            .rst      ( rst               ),
+            .clr      ( buffer_clr        ),
+            .ce       ( ce                ),
+            .features ( r_out_mult_serial ),
+            .out      ( r_out_buffer      ),
+            .acc_done ( burst_complete    )
         );
        
         serial_data_scheduler #(
@@ -205,7 +197,7 @@ localparam int INITIAL_LATENCY = (TEMP < 0) ? 5 : (TEMP == 1) ? 5 : 4;
             .PRECISION      ( PRECISION      )
         ) dut (
             .clk            ( clk              ),
-            .clr            ( clr              ),
+            .clr            ( memory_clr       ),
             .ce             ( ce               ),
             .data_out       ( weights_parallel ),
             .bias           ( bias_parallel    )
@@ -243,7 +235,7 @@ localparam int INITIAL_LATENCY = (TEMP < 0) ? 5 : (TEMP == 1) ? 5 : 4;
                     .clr            ( buffer_clr                ),
                     .ce             ( ce                        ),
                     .data_in        ( r_out_mult_parallel[i][j] ),
-                    .data_out       ( r_out_top          [j][i] ),
+                    .data_out       ( r_out_top_parallel[j][i]  ),
                     .burst_complete ( burst_complete            ) 
                 ); 
                 end      
@@ -256,7 +248,7 @@ localparam int INITIAL_LATENCY = (TEMP < 0) ? 5 : (TEMP == 1) ? 5 : 4;
         if(TEMP > 1) begin
             for(int j=0; j<NUM_FEATURES; j++) begin
                 for(int i=0; i<TEMP; i++) begin
-                   r_out_buffer[j][i*(M/TEMP)+:(M/TEMP)] = r_out_top[j][TEMP-1-i];
+                   r_out_buffer[j][i*(M/TEMP)+:(M/TEMP)] = r_out_top_parallel[j][TEMP-1-i];
                 end 
             end
         end

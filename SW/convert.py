@@ -41,19 +41,18 @@ class ToMem:
         with open("../HW/features.mem", "w") as f:
             for i in self.features:
                 for j in i:
-                    f.write(toBin(j, self.feature_prec)+"\n")
+                    f.write(toHex(j, self.feature_prec)+" ")
+                f.write("\n")
 
     def saveOut(self):
-        with open("../HW/out_truth.mem", "w") as f:
-            for i in self.out:
-                for j in i:
-                    f.write(toBin(j, self.feature_prec)+"\n")
+        for i, k in enumerate(self.out):
+            with open(f"../HW/out_truth_{i+1}.mem", "w") as f:
+                for j in k:
+                    f.write(str(j)+'\n')
 
     def saveWeights(self, split=1):
         assert len(self.weights) == len(self.superbias)
         with open("../HW/weights.mem", "w") as f:
-            # for i in range(len(self.superbias)*split):
-            # f.write(toHex(self.superbias[i], self.bias_prec)+"".join([toHex(j, self.feature_prec) for j in self.weights[i]])+"\n")
             weights_split = [np.array_split(i, split) for i in self.weights]
             weights_split_flat = [x for xs in weights_split for x in xs]
 
@@ -68,6 +67,11 @@ class ToMem:
 
                 f.write(tmp)
                 tmp = ""
+
+    def saveAll(self, split=1):
+        self.saveFeatures()
+        self.saveWeights(split)
+        self.saveOut()
 
 
 saver = ToMem(8, 32)

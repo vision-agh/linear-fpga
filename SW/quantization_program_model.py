@@ -1,4 +1,5 @@
 import numpy as np
+import convert as con
 
 # ============================================================================
 # KWANTYZACJA: r = S(q - Z)
@@ -153,6 +154,9 @@ def compute_fpga_params(q_data, N):
     term_inside = q_biases + (N * Z_in * Z_w) - (Z_in * aw)
     super_bias = M * term_inside + Z_out
 
+    # castujemy float na int, nie wiem czy da sie lepiej
+    super_bias = super_bias.astype(np.int32)
+
     return {
         'M': M,
         'aw': aw,
@@ -283,6 +287,15 @@ if __name__ == "__main__":
     print("\nBŁĘDY:")
     print(f"  Maksymalny:     {max_diff * 100:.6f}%")
     print(f"  Średni:         {mean_diff * 100:.6f}%")
+
+    saver = con.ToMem(PRECISION, BIAS_BITS)
+
+    saver.addFeature(q_data['q_input'])
+    saver.setSuperbias(fpga_params['super_bias'])
+    saver.setWeights(q_data['q_weights'])
+    saver.addOut(q_output)
+
+    saver.saveAll(2)
 
     if relative_error < 0.015:
         print("\nKwantyzacja działa poprawnie!")

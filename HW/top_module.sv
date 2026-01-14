@@ -42,7 +42,7 @@
     logic [BIAS_PRECISION-1:0] bias;
     
     logic [PRECISION-1:0] r_out_mult    [NUM_FEATURES-1:0];
-    logic [BIAS_PRECISION-1:0] r_out_mult_serial   [NUM_FEATURES-1:0]; // 
+    logic [PRECISION-1:0] r_out_mult_serial   [NUM_FEATURES-1:0]; // 
     logic [PRECISION-1:0] r_out_mult_parallel [TEMP-1:0][NUM_FEATURES-1:0];
 
 
@@ -92,8 +92,7 @@
             .bias       ( bias              ),     
             .weights_in ( weights_serial    ),
             .features   ( features_sliced   ),
-            .out        (                   ),
-            .long_out   ( r_out_mult_serial )
+            .out        ( r_out_mult_serial )
         );
        
          serial_accumulator #(

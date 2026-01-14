@@ -14,8 +14,7 @@ module output_stage #(
     input  logic [BIAS_PRECISION-1:0] ai, 
     input  logic [BIAS_PRECISION-1:0] acc,
     input  logic [BIAS_PRECISION-1:0] bias,  
-    output logic [PRECISION-1:0]      out,
-    output logic [BIAS_PRECISION-1:0] long_out
+    output logic [PRECISION-1:0]      out
 );
 
     logic signed [OUTPUT_STAGE_PRECISION-1 : 0] n_out;
@@ -23,10 +22,14 @@ module output_stage #(
     always_ff @(posedge clk) begin 
         if (rst) begin
             out      <= 0; 
-            long_out <= 0;
         end else begin
-            out      <= n_out[7:0];
-            long_out <= n_out;
+            if(n_out < 0) begin
+                out      <= 0;
+            end else if(n_out > 255) begin
+                out      <= 255;
+            end else begin
+                out      <= n_out[7:0];
+            end
         end
     end
     

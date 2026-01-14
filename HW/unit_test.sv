@@ -2,16 +2,16 @@ module unit_test (
 );
 
 //`include "params.txt"
-localparam int TEMP           = 1;
+localparam int TEMP           = -2;
 localparam int NUM_EXAMPLES   = 1;
 localparam int PRECISION      = 8;
 localparam int BIAS_PRECISION = 32;
 localparam int NUM_FEATURES   = 1;
-localparam int MUL_PER_FEATURE= 4;
-localparam int N              = 8;
-localparam int M              = 8;
-localparam int M_MUL          = 58948426;
-localparam int Z_WEIGHTS      = 109;
+localparam int MUL_PER_FEATURE= 1;
+localparam int N              = 24;
+localparam int M              = 16;
+localparam int M_MUL          = 7900041;
+localparam int Z_WEIGHTS      = 128;
 
 logic [PRECISION-1:0] raw_examples [N*NUM_FEATURES*NUM_EXAMPLES];
 logic [PRECISION-1:0] examples [NUM_EXAMPLES][NUM_FEATURES][N];

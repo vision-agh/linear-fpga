@@ -1,7 +1,7 @@
 `timescale 1ns / 1ps
 
 module multiplier_top #(
-    parameter int TEMP                   = 1,
+    parameter int TEMP                   = 6,
     parameter int PRECISION              = 8,
     parameter int BIAS_PRECISION         = 32,
     parameter int OUTPUT_STAGE_PRECISION = 64,
@@ -17,8 +17,7 @@ module multiplier_top #(
     input  logic [BIAS_PRECISION-1:0] bias,     
     input  logic [PRECISION-1:0]      weights_in [N-1:0],
     input  logic [PRECISION-1:0]      features   [NUM_FEATURES-1:0][N-1:0],
-    output logic [PRECISION-1:0]      out        [NUM_FEATURES-1:0],
-    output logic [BIAS_PRECISION-1:0] long_out   [NUM_FEATURES-1:0] 
+    output logic [PRECISION-1:0]      out        [NUM_FEATURES-1:0]
 );
 
     localparam int DELAY_FEATURES = (TEMP < 0) ? 1 : (TEMP == 1) ? 1 : 1; //when temp < 0 == 2,  temp > 1 == 1
@@ -35,7 +34,6 @@ module multiplier_top #(
     logic [BIAS_PRECISION-1:0] d_bias;
     logic [PRECISION-1:0]      d_weights_in [N-1:0];
     
-    logic [BIAS_PRECISION-1:0] long_out        [NUM_FEATURES-1:0];
     
     genvar i;
     
@@ -116,8 +114,7 @@ module multiplier_top #(
             .ai       ( ai[i]  ),
             .acc      ( acc[i] ),
             .bias     ( d_bias ),
-            .out      ( out[i] ),
-            .long_out ( long_out[i] )
+            .out      ( out[i] )
         );
     end
 

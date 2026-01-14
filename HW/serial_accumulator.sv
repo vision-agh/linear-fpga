@@ -11,7 +11,7 @@ module serial_accumulator #(
     input  logic                      rst,
     input  logic                      clr,
     input  logic                      ce,     
-    input  logic [BIAS_PRECISION-1:0] features   [NUM_FEATURES-1:0],
+    input  logic [PRECISION-1:0]      features   [NUM_FEATURES-1:0],
     output logic [PRECISION-1:0]      out        [NUM_FEATURES-1:0][M-1:0],
     output logic                      acc_done    
 );
@@ -27,7 +27,7 @@ module serial_accumulator #(
     logic [$clog2(INITIAL_LATENCY):0] count = 0;
     logic [$clog2(M)+1:0] bucket_count = 0;
     logic [$clog2(TEMP):0] segment_count = 0;
-    logic [BIAS_PRECISION-1:0] accumulator [NUM_FEATURES-1:0][M-1:0];
+    logic signed [BIAS_PRECISION-1:0] accumulator [NUM_FEATURES-1:0][M-1:0];
     
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
@@ -67,7 +67,12 @@ module serial_accumulator #(
                             if(segment_count == TEMP-1) begin
                                 for(int i=0; i<NUM_FEATURES; i++) begin
                                     for(int j=0; j<M; j++) begin
-                                        out[i][j] <= accumulator[i][M-1-j][PRECISION-1:0];
+                                        if(accumulator[i][M-1-j]>255)
+                                             out[i][j] <= 255;
+                                        else if(accumulator[i][M-1-j]<0)
+                                            out[i][j] <= 0;
+                                        else
+                                            out[i][j] <= accumulator[i][M-1-j][PRECISION-1:0];
                                     end
                                 end
                                 state <= IDLE;

@@ -2,16 +2,51 @@ module unit_test (
 );
 
 //`include "params.txt"
-localparam int TEMP           = -2;
-localparam int NUM_EXAMPLES   = 1;
-localparam int PRECISION      = 8;
+localparam int TEMP           = -2;  // values below 0 slice the feature vector into N parts and process them serially;
+                                     // values greater than 1 allow using multiple multipliers in parallel
+                                     // values equal to 1 use single multiplier
+localparam int NUM_EXAMPLES   = 1;   // testbench parameter; indicates how many test vectors are used
+localparam int PRECISION      = 8; 
 localparam int BIAS_PRECISION = 32;
-localparam int NUM_FEATURES   = 1;
-localparam int MUL_PER_FEATURE= 1;
-localparam int N              = 24;
-localparam int M              = 16;
-localparam int M_MUL          = 7900041;
-localparam int Z_WEIGHTS      = 128;
+localparam int NUM_FEATURES   = 1;   // number of features processed simultaneously by the multiplier
+localparam int MUL_PER_FEATURE= 6;   // number of vector multipliers used per feature
+localparam int N              = 24;  // length of the feature vector
+localparam int M              = 16;  // length of the output vector
+localparam int M_MUL          = 7755054; // scaling constant used during quantization, computed in the Python model
+localparam int Z_WEIGHTS      = 128;     // weight zero-point, computed in the Python model
+
+
+ initial begin
+    if (MUL_PER_FEATURE == 0) begin
+        $error("mul_per_feature = 0 is not allowed");
+        $fatal;
+    end
+
+    if (TEMP == 0) begin
+        $error("temp = 0 is not allowed");
+        $fatal;
+    end
+
+    if (TEMP < 0) begin
+        if ((N/(-TEMP)) % MUL_PER_FEATURE != 0) begin
+            $error("mul_per_feature (%0d) is NOT a divisor of N/TEMP (%0d)", MUL_PER_FEATURE, N);
+            $fatal;
+        end
+    end else begin
+        if (N % MUL_PER_FEATURE != 0) begin
+            $error("mul_per_feature (%0d) is NOT a divisor of N (%0d)", MUL_PER_FEATURE, N);
+            $fatal;
+        end
+     end
+
+    if (N % TEMP != 0) begin
+        $error("temp (%0d) is NOT a divisor of N (%0d)", TEMP, N);
+        $fatal;
+    end
+
+    // Opcjonalnie: info, że wszystko OK
+    $display("Parameter check OK: N=%0d, mul_per_feature=%0d, temp=%0d", N, MUL_PER_FEATURE, TEMP);
+ end
 
 logic [PRECISION-1:0] raw_examples [N*NUM_FEATURES*NUM_EXAMPLES];
 logic [PRECISION-1:0] examples [NUM_EXAMPLES][NUM_FEATURES][N];
@@ -47,6 +82,7 @@ top_module #(
   .PRECISION(PRECISION),
   .BIAS_PRECISION(BIAS_PRECISION),
   .NUM_FEATURES(NUM_FEATURES),
+  .MUL_PER_FEATURE(MUL_PER_FEATURE),
   .N(N),
   .M(M),
   .M_MUL(M_MUL),

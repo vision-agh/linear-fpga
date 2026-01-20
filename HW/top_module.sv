@@ -1,9 +1,9 @@
  module top_module #(
-    parameter int TEMP            = 1,
+    parameter int TEMP            = 1,      
     parameter int PRECISION       = 8,
     parameter int BIAS_PRECISION  = 32,
     parameter int NUM_FEATURES    = 2,          // number of parallel features
-    parameter int MUL_PER_FEATURE = 2,          // number of multiplier instantiations per feature
+    parameter int MUL_PER_FEATURE = 8,          // number of multiplier instantiations per feature
     parameter int N               = 12,          // elements of feature
     parameter int M               = 32,          // elements of output
     parameter int M_MUL           = 2094967296, // multiplier constant needed to calculate pseudo-float number

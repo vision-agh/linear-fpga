@@ -1,7 +1,10 @@
+`timescale 1ns / 1ps
+
 module memory_weights #(
     parameter int DATA_WIDTH = 1024,
     parameter int ADDR_DEPTH = 1024,
     parameter int ADDR_WIDTH = $clog2(ADDR_DEPTH),
+    parameter MEMORY_FILE = "generated/fc1_weights.mem",
     parameter RAM_TYPE = "block"
 ) (
     input  logic                  clk,
@@ -10,14 +13,16 @@ module memory_weights #(
     output logic [DATA_WIDTH-1:0] dout
 );
 
-    (* ram_style = RAM_TYPE *) logic [DATA_WIDTH-1:0] mem[ADDR_DEPTH-1:0] = '{default:0};
-    
+    (* ram_style = RAM_TYPE *) logic [DATA_WIDTH-1:0] mem [0:ADDR_DEPTH-1];
+
     initial begin
-        $readmemh("memory_file.mem", mem);
+        $readmemh(MEMORY_FILE, mem);
     end
 
     always_ff @(posedge clk) begin
-        if(ce) dout <= mem[addr];           
+        if (ce) begin
+            dout <= mem[addr];
+        end
     end
 
 endmodule

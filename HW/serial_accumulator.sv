@@ -1,7 +1,6 @@
 `timescale 1ns / 1ps
 module serial_accumulator #(
-    parameter int PRECISION              = 8,
-    parameter int BIAS_PRECISION         = 32,
+    parameter int PRECISION              = 64,
     parameter int TEMP                   = 2,
     parameter int INITIAL_LATENCY        = 4,
     parameter int NUM_FEATURES           = 1, // number of parallel features
@@ -11,8 +10,8 @@ module serial_accumulator #(
     input  logic                      rst,
     input  logic                      clr,
     input  logic                      ce,     
-    input  logic [PRECISION-1:0]      features   [NUM_FEATURES-1:0],
-    output logic [PRECISION-1:0]      out        [NUM_FEATURES-1:0][M-1:0],
+    input  logic signed [PRECISION-1:0] features [NUM_FEATURES-1:0],
+    output logic signed [PRECISION-1:0] out      [NUM_FEATURES-1:0][M-1:0],
     output logic                      acc_done    
 );
 
@@ -24,31 +23,41 @@ module serial_accumulator #(
     
     state_t state = LATENCY;
 
+    localparam int LATENCY_LAST = (INITIAL_LATENCY > 1) ? (INITIAL_LATENCY - 2) : 0;
+
     logic [$clog2(INITIAL_LATENCY):0] count = 0;
     logic [$clog2(M)+1:0] bucket_count = 0;
     logic [$clog2(TEMP):0] segment_count = 0;
-    logic signed [BIAS_PRECISION-1:0] accumulator [NUM_FEATURES-1:0][M-1:0];
+    logic signed [PRECISION-1:0] accumulator [NUM_FEATURES-1:0][M-1:0];
     
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
             count         <= 0;
             bucket_count  <= 0;
             segment_count <= 0;
-            accumulator   <= '{default:0};
+            for (int reset_feature_idx = 0; reset_feature_idx < NUM_FEATURES; reset_feature_idx++) begin
+                for (int reset_bucket_idx = 0; reset_bucket_idx < M; reset_bucket_idx++) begin
+                    accumulator[reset_feature_idx][reset_bucket_idx] <= '0;
+                end
+            end
             state         <= LATENCY;
             acc_done      <= 0;
         end  else if (clr) begin
             count         <= 0;
             bucket_count  <= 0;
             segment_count <= 0;
-            accumulator   <= '{default:0};
+            for (int clr_feature_idx = 0; clr_feature_idx < NUM_FEATURES; clr_feature_idx++) begin
+                for (int clr_bucket_idx = 0; clr_bucket_idx < M; clr_bucket_idx++) begin
+                    accumulator[clr_feature_idx][clr_bucket_idx] <= '0;
+                end
+            end
             state         <= LATENCY;
             acc_done      <= 0;
         end else begin
             if (ce) begin
                  case (state)
                     LATENCY: begin
-                        if (count < INITIAL_LATENCY) begin
+                        if (count < LATENCY_LAST) begin
                             state <= LATENCY;
                             count <= count + 1;  
                         end else begin
@@ -67,12 +76,7 @@ module serial_accumulator #(
                             if(segment_count == TEMP-1) begin
                                 for(int i=0; i<NUM_FEATURES; i++) begin
                                     for(int j=0; j<M; j++) begin
-                                        if(accumulator[i][M-1-j]>255)
-                                             out[i][j] <= 255;
-                                        else if(accumulator[i][M-1-j]<0)
-                                            out[i][j] <= 0;
-                                        else
-                                            out[i][j] <= accumulator[i][M-1-j][PRECISION-1:0];
+                                        out[i][j] <= accumulator[i][j];
                                     end
                                 end
                                 state <= IDLE;

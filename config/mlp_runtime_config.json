@@ -1,0 +1,63 @@
+{
+  "runtime_dir": "HW/generated/runtime",
+  "ui": {
+    "num_features": 1,
+    "port": 8123,
+    "input_file": "ui_input.mem",
+    "output_file": "ui_sim_output.txt"
+  },
+  "layers": {
+    "fc1": {
+      "temp": -8,
+      "mul_per_feature": 16
+    },
+    "fc2": {
+      "temp": -8,
+      "mul_per_feature": 4
+    },
+    "fc3": {
+      "temp": -8,
+      "mul_per_feature": 4
+    }
+  },
+  "sweep": {
+    "fc1": {
+      "temp": [
+        1,
+        2,
+        -2
+      ],
+      "mul_per_feature": [
+        1,
+        2,
+        4,
+        8
+      ]
+    },
+    "fc2": {
+      "temp": [
+        1,
+        2,
+        -2
+      ],
+      "mul_per_feature": [
+        1,
+        2,
+        4,
+        8
+      ]
+    },
+    "fc3": {
+      "temp": [
+        1,
+        2
+      ],
+      "mul_per_feature": [
+        1,
+        2,
+        4,
+        8
+      ]
+    }
+  }
+}

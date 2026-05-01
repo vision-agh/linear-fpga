@@ -1,80 +1,68 @@
 `timescale 1ns / 1ps
 
 module memory_fetcher #(
-    parameter int BRAM_WIDTH     = 3,
-    parameter int M              = 5,
-    parameter int N              = 5,
-    parameter int BIAS_PRECISION = 32,
-    parameter int PRECISION      = 5
+    parameter int BRAM_WIDTH       = 3,
+    parameter int M                = 5,
+    parameter int N                = 5,
+    parameter int BIAS_PRECISION   = 32,
+    parameter int WEIGHT_PRECISION = 8,
+    parameter MEMORY_FILE          = "generated/fc1_weights.mem"
 ) (
-    input  logic                      clk,
-    input  logic                      clr,
-    input  logic                      ce,
-    output logic [PRECISION-1:0]      data_out [N-1:0],
-    output logic [BIAS_PRECISION-1:0] bias
+    input  logic                                   clk,
+    input  logic                                   clr,
+    input  logic                                   ce,
+    output logic [WEIGHT_PRECISION-1:0]            data_out [N-1:0],
+    output logic signed [BIAS_PRECISION-1:0]       bias
 );
-    
-     memory_weights #(
-        .DATA_WIDTH ( BRAM_WIDTH ),
-        .ADDR_DEPTH ( M          )
+
+    logic [$clog2(M)-1:0] line_counter;
+    logic [BRAM_WIDTH-1:0] mem_data_out;
+
+    logic [WEIGHT_PRECISION-1:0] next_data_out [N-1:0];
+    logic signed [BIAS_PRECISION-1:0]   next_bias;
+
+    memory_weights #(
+        .DATA_WIDTH  ( BRAM_WIDTH  ),
+        .ADDR_DEPTH  ( M           ),
+        .MEMORY_FILE ( MEMORY_FILE )
     ) u_memory_weights (
         .clk  ( clk          ),
         .ce   ( ce           ),
         .addr ( line_counter ),
         .dout ( mem_data_out )
     );
-    
-   logic [$clog2(M)-1:0]  line_counter;
-   logic [BRAM_WIDTH-1:0] mem_data_out;
-   
-   logic [PRECISION-1:0]      r_data_out [N-1:0];
-   logic [BIAS_PRECISION-1:0] r_bias;
-   
-   logic [PRECISION-1:0]      n_data_out [N-1:0];
-   logic [BIAS_PRECISION-1:0] n_bias;
-    
-    always_ff @ (posedge clk) begin
+
+    always_ff @(posedge clk) begin
         if (clr) begin
-            line_counter <= 0;
-        end else begin
-            if (ce) begin
-                if (line_counter < M-1) begin
-                    line_counter <= line_counter + 1;                       
-                end else begin
-                    line_counter <= 0;
-                end               
+            line_counter <= '0;
+            for (int reset_idx = 0; reset_idx < N; reset_idx++) begin
+                data_out[reset_idx] <= '0;
             end
+            bias         <= '0;
+        end else if (ce) begin
+            if (line_counter < M - 1) begin
+                line_counter <= line_counter + 1'b1;
+            end else begin
+                line_counter <= '0;
+            end
+
+            for (int write_idx = 0; write_idx < N; write_idx++) begin
+                data_out[write_idx] <= next_data_out[write_idx];
+            end
+            bias     <= next_bias;
         end
     end
-    
-    always_ff @ (posedge clk) begin
-        if (clr) begin
-            r_data_out     <= '{default:0};
-            r_bias         <= 0;
-        end else begin
-            if (ce) begin
-               r_data_out <= n_data_out;
-               r_bias     <= n_bias;
-            end
-        end
-    end
-    
+
     always_comb begin
-        if (clr) begin
-            n_data_out     = '{default:0};
-            n_bias         = 0;
-        end else begin
-            if (ce) begin         
-                for(int i=N-1; i>=0; i--) begin
-                    n_data_out[i] = mem_data_out[i<<(3)+:PRECISION]; 
-                end              
-                n_bias = mem_data_out[N<<(3)+:BIAS_PRECISION];
-            end
+        for (int init_idx = 0; init_idx < N; init_idx++) begin
+            next_data_out[init_idx] = '0;
         end
+        next_bias = '0;
+
+        for (int i = 0; i < N; i++) begin
+            next_data_out[i] = mem_data_out[(N - 1 - i) * WEIGHT_PRECISION +: WEIGHT_PRECISION];
+        end
+        next_bias = $signed(mem_data_out[N * WEIGHT_PRECISION +: BIAS_PRECISION]);
     end
-    
-    assign data_out = r_data_out;
-    assign bias     = r_bias;
-                         
-    
+
 endmodule

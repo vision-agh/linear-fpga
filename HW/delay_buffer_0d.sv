@@ -9,15 +9,13 @@ module delay_buffer_0d #(
     output [PRECISION-1:0] odata
 );
     parameter int I_DELAY = DELAY + 1;
-
-    logic [PRECISION-1:0] r_idata [I_DELAY-1:0] = '{default:0};
-    
+    logic [PRECISION-1:0] r_idata [I_DELAY-1:0];
 
     always_ff @(posedge clk) begin
-        if(DELAY == 0)
-            r_idata[I_DELAY-1] = idata;
-        else
-            r_idata <= {r_idata[I_DELAY-2:0], idata};
+        r_idata[0] <= idata;
+        for (int i = 1; i < I_DELAY; i++) begin
+            r_idata[i] <= r_idata[i-1];
+        end
     end 
     
     assign odata = r_idata[I_DELAY-1];

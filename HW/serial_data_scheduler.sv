@@ -16,6 +16,7 @@ module serial_data_scheduler #(
     output logic [PRECISION-1:0]      features_sliced [NUM_FEATURES-1:0][N/TEMP-1:0]
 );
 
+    localparam int WAIT_LENGTH = M-1;
 
     typedef enum logic [1:0] {
         IDLE,
@@ -27,20 +28,22 @@ module serial_data_scheduler #(
     
     logic [$clog2(TEMP):0] counter_slice;
     logic [$clog2(WAIT_LENGTH):0] counter_wait;
-    
-    parameter int WAIT_LENGTH = M-1;
   
     always_ff @(posedge clk) begin
         if(rst) begin
-            counter_slice <= TEMP-1;
+            counter_slice <= 0;
             counter_wait  <= 0;
-            features_sliced <= '{default:0};
+            for (int feature_idx = 0; feature_idx < NUM_FEATURES; feature_idx++) begin
+                for (int slice_idx = 0; slice_idx < N / TEMP; slice_idx++) begin
+                    features_sliced[feature_idx][slice_idx] <= '0;
+                end
+            end
             state         <= IDLE;
         end else
             if(ce) begin
                   unique case(state) 
                     IDLE:  begin
-                        counter_slice <= TEMP-1;
+                        counter_slice <= 0;
                         counter_wait <= 0; 
                         if(ctrl == 1)
                             state <= SLICE;
@@ -49,18 +52,20 @@ module serial_data_scheduler #(
                     end
                     SLICE: begin
                         for(int i=0; i<NUM_FEATURES; i++) begin
-                            features_sliced[i] <= features[i][counter_slice*N/TEMP+:N/TEMP];
+                            for (int j = 0; j < N / TEMP; j++) begin
+                                features_sliced[i][j] <= features[i][counter_slice * (N / TEMP) + j];
+                            end
                         end
                         state <= WAITING;
                     end
                     WAITING: begin 
                         counter_wait++;
                         if(counter_wait == WAIT_LENGTH) begin
-                            if(counter_slice == 0) begin
+                            if(counter_slice == TEMP-1) begin
                                 state <= IDLE;
-                                counter_slice <= TEMP-1;
+                                counter_slice <= 0;
                             end else begin 
-                                counter_slice--;
+                                counter_slice++;
                                 counter_wait <= 0;
                                 state <= SLICE;
                             end

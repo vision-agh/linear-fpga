@@ -1,171 +1,210 @@
-module unit_test (
-);
+`timescale 1ns / 1ps
 
-//`include "params.txt"
-localparam int TEMP           = -2;  // values below 0 slice the feature vector into N parts and process them serially;
-                                     // values greater than 1 allow using multiple multipliers in parallel
-                                     // values equal to 1 use single multiplier
-localparam int NUM_EXAMPLES   = 1;   // testbench parameter; indicates how many test vectors are used
-localparam int PRECISION      = 8; 
-localparam int BIAS_PRECISION = 32;
-localparam int NUM_FEATURES   = 1;   // number of features processed simultaneously by the multiplier
-localparam int MUL_PER_FEATURE= 6;   // number of vector multipliers used per feature
-localparam int N              = 24;  // length of the feature vector
-localparam int M              = 16;  // length of the output vector
-localparam int M_MUL          = 7755054; // scaling constant used during quantization, computed in the Python model
-localparam int Z_WEIGHTS      = 128;     // weight zero-point, computed in the Python model
+module unit_test;
 
+`include "generated/fc1_params.svh"
 
- initial begin
-    if (MUL_PER_FEATURE == 0) begin
-        $error("mul_per_feature = 0 is not allowed");
-        $fatal;
-    end
-
-    if (TEMP == 0) begin
-        $error("temp = 0 is not allowed");
-        $fatal;
-    end
-
-    if (TEMP < 0) begin
-        if ((N/(-TEMP)) % MUL_PER_FEATURE != 0) begin
-            $error("mul_per_feature (%0d) is NOT a divisor of N/TEMP (%0d)", MUL_PER_FEATURE, N);
-            $fatal;
-        end
-    end else begin
-        if (N % MUL_PER_FEATURE != 0) begin
-            $error("mul_per_feature (%0d) is NOT a divisor of N (%0d)", MUL_PER_FEATURE, N);
-            $fatal;
-        end
-     end
-
-    if (N % TEMP != 0) begin
-        $error("temp (%0d) is NOT a divisor of N (%0d)", TEMP, N);
-        $fatal;
-    end
-
-    // Opcjonalnie: info, że wszystko OK
-    $display("Parameter check OK: N=%0d, mul_per_feature=%0d, temp=%0d", N, MUL_PER_FEATURE, TEMP);
- end
-
-logic [PRECISION-1:0] raw_examples [N*NUM_FEATURES*NUM_EXAMPLES];
-logic [PRECISION-1:0] examples [NUM_EXAMPLES][NUM_FEATURES][N];
-logic [PRECISION-1:0] features [NUM_FEATURES][N];
-logic [PRECISION-1:0] out [NUM_FEATURES][M];
-logic [PRECISION-1:0] latched_out [NUM_FEATURES][M];
-logic clk = 1;
-logic ce = 1;
-logic rst = 1;
-
-integer ex, fea, n, i;
+localparam int TEMP = 2;
+localparam int TEST_MUL_PER_FEATURE = 8;
+localparam int NUM_FEATURES = 2;
+localparam int NUM_EXAMPLES = 1;
+localparam FEATURES_FILE = "generated/fc1_test_input.mem";
+localparam TRUTH_FILE = "generated/fc1_test_truth.mem";
+localparam WEIGHTS_FILE = "generated/fc1_weights.mem";
+localparam OUTPUT_FILE = "generated/fc1_sim_output.txt";
 
 initial begin
-  $readmemh("features.txt", raw_examples);
-  // unflatten
-  for (i = 0; i < NUM_EXAMPLES*NUM_FEATURES*N; i = i + 1) begin
-      ex = i / (NUM_FEATURES * N);
-      fea = (i / N) % NUM_FEATURES;
-      n = i % N;
-      examples[ex][fea][n] = raw_examples[i];
-  end
+    if (MUL_PER_FEATURE <= 0) begin
+        $fatal(1, "MUL_PER_FEATURE must be positive");
+    end
+    if (TEMP == 0) begin
+        $fatal(1, "TEMP must not be zero");
+    end
+    if (TEMP < 0) begin
+        if ((N % (-TEMP)) != 0) begin
+            $fatal(1, "Negative TEMP must divide N exactly");
+        end
+        if (((N / (-TEMP)) % MUL_PER_FEATURE) != 0) begin
+            $fatal(1, "For TEMP < 0, MUL_PER_FEATURE must divide N/(-TEMP)");
+        end
+    end else begin
+        if ((N % MUL_PER_FEATURE) != 0) begin
+            $fatal(1, "For TEMP > 0, MUL_PER_FEATURE must divide N");
+        end
+    end
+end
+
+logic [INPUT_PRECISION-1:0] raw_examples [N * NUM_FEATURES * NUM_EXAMPLES];
+logic [INPUT_PRECISION-1:0] examples [NUM_EXAMPLES-1:0][NUM_FEATURES-1:0][N-1:0];
+logic [INPUT_PRECISION-1:0] features [NUM_FEATURES-1:0][N-1:0];
+logic [OUTPUT_PRECISION-1:0] out [NUM_FEATURES-1:0][M-1:0];
+logic [OUTPUT_PRECISION-1:0] latched_out [NUM_FEATURES-1:0][M-1:0];
+logic [OUTPUT_PRECISION-1:0] raw_truth [M * NUM_FEATURES * NUM_EXAMPLES];
+logic [OUTPUT_PRECISION-1:0] truth [NUM_EXAMPLES-1:0][NUM_FEATURES-1:0][M-1:0];
+logic clk = 1'b1;
+logic ce = 1'b1;
+logic rst = 1'b1;
+
+integer ex;
+integer fea;
+integer n;
+integer i;
+
+initial begin
+    $readmemh(FEATURES_FILE, raw_examples);
+    $readmemh(TRUTH_FILE, raw_truth);
+    for (i = 0; i < NUM_EXAMPLES * NUM_FEATURES * N; i = i + 1) begin
+        ex = i / (NUM_FEATURES * N);
+        fea = (i / N) % NUM_FEATURES;
+        n = i % N;
+        examples[ex][fea][n] = raw_examples[i];
+    end
+    for (i = 0; i < NUM_EXAMPLES * NUM_FEATURES * M; i = i + 1) begin
+        ex = i / (NUM_FEATURES * M);
+        fea = (i / M) % NUM_FEATURES;
+        n = i % M;
+        truth[ex][fea][n] = raw_truth[i];
+    end
 end
 
 always #1 clk = ~clk;
 
 logic out_ready;
-logic out_valid = 0;
+logic out_valid;
 logic in_ready;
-logic in_valid = 0;
+logic in_valid;
 
 top_module #(
-  .TEMP(TEMP),
-  .PRECISION(PRECISION),
-  .BIAS_PRECISION(BIAS_PRECISION),
-  .NUM_FEATURES(NUM_FEATURES),
-  .MUL_PER_FEATURE(MUL_PER_FEATURE),
-  .N(N),
-  .M(M),
-  .M_MUL(M_MUL),
-  .Z_WEIGHTS(Z_WEIGHTS)
-) dut
-(
-    .out_valid(in_valid),
-    .in_ready(out_ready),
-    .in_valid(out_valid),
-    .out_ready(in_ready),
-    .clk(clk),
-    .rst(rst),
-    .ce(ce),
-    .features(features),
-    .out(out)
+    .TEMP             ( TEMP             ),
+    .INPUT_PRECISION  ( INPUT_PRECISION  ),
+    .WEIGHT_PRECISION ( WEIGHT_PRECISION ),
+    .OUTPUT_PRECISION ( OUTPUT_PRECISION ),
+    .ACC_PRECISION    ( BIAS_PRECISION   ),
+    .NUM_FEATURES     ( NUM_FEATURES     ),
+    .MUL_PER_FEATURE  ( TEST_MUL_PER_FEATURE ),
+    .N                ( N                ),
+    .M                ( M                ),
+    .IN_ZP            ( IN_ZP            ),
+    .W_ZP             ( W_ZP             ),
+    .OUT_ZP           ( OUT_ZP           ),
+    .M_MUL            ( M_MUL            ),
+    .M_SHIFT          ( M_SHIFT          ),
+    .MEMORY_FILE      ( WEIGHTS_FILE     )
+) dut (
+    .out_valid ( out_valid ),
+    .in_ready  ( in_ready  ),
+    .in_valid  ( in_valid  ),
+    .out_ready ( out_ready ),
+    .clk       ( clk       ),
+    .rst       ( rst       ),
+    .ce        ( ce        ),
+    .features  ( features  ),
+    .out       ( out       )
 );
 
-typedef enum logic [3:0] {
-  LOAD,
-  SEND,
-  RECEIVE,
-  SAVE,
-  FINISHED
+typedef enum logic [2:0] {
+    LOAD,
+    SEND,
+    RECEIVE,
+    SAVE,
+    FINISHED
 } state_t;
 
-state_t stan = LOAD;
-logic [31:0] index = 0;
+state_t state = LOAD;
+logic [31:0] index = '0;
 
-string filename; // 64-char filename buffer
+string filename;
 integer file;
-integer f, m;
+integer mismatch_count;
+integer compare_count;
 
-always_ff @(posedge clk) begin : StateMachine
-  unique case (stan)
-    LOAD: begin
-      if (index < NUM_EXAMPLES) begin
-        features <= examples[index];
-        rst <= 0;
-        stan <= SEND;
-        index += 1;
-      end else begin
-        $display("FINISHED");
-        stan <= FINISHED;
-      end
-    end
-    SEND: begin
-      out_valid <= 1;
-      if (out_valid && out_ready) begin
-        out_valid <= 0;
-        stan <= RECEIVE;
-      end
-    end
-    RECEIVE: begin
-      in_ready <= 1;
-      if (in_ready && in_valid) begin
-        in_ready <= 0;
-        stan <= SAVE;
-        latched_out <= out;
-      end
-    end
-    SAVE: begin
-      filename = $sformatf("output_example_%0d.bin", index);
-
-      // Open file for writing
-      file = $fopen(filename, "wb");
-      if (file) begin
-        // Write latched_out to file
-        for (int f = 0; f < NUM_FEATURES; f++) begin
-          for (int m = 0; m < M; m++) begin
-            $fwrite(file, "%0d\n", latched_out[f][m]);
-          end
+always_ff @(posedge clk) begin
+    unique case (state)
+        LOAD: begin
+            in_valid <= 1'b0;
+            out_ready <= 1'b0;
+            if (index < NUM_EXAMPLES) begin
+                for (int feature_load_idx = 0; feature_load_idx < NUM_FEATURES; feature_load_idx++) begin
+                    for (int input_load_idx = 0; input_load_idx < N; input_load_idx++) begin
+                        features[feature_load_idx][input_load_idx] <= examples[index][feature_load_idx][input_load_idx];
+                    end
+                end
+                rst <= 1'b0;
+                state <= SEND;
+                index <= index + 1'b1;
+            end else begin
+                $display("FINISHED");
+                state <= FINISHED;
+            end
         end
-        $fclose(file);
-        $display("Saved example %0d to %s", index, filename);
-      end else begin
-        $display("ERROR: Could not open file %s", filename);
-      end
-      stan <= LOAD;
-    end
-    FINISHED: begin
-      $finish;
-    end
-  endcase
+
+        SEND: begin
+            in_valid <= 1'b1;
+            if (in_valid && in_ready) begin
+                in_valid <= 1'b0;
+                state <= RECEIVE;
+            end
+        end
+
+        RECEIVE: begin
+            out_ready <= 1'b1;
+            if (out_ready && out_valid) begin
+                out_ready <= 1'b0;
+                for (int feature_store_idx = 0; feature_store_idx < NUM_FEATURES; feature_store_idx++) begin
+                    for (int output_store_idx = 0; output_store_idx < M; output_store_idx++) begin
+                        latched_out[feature_store_idx][output_store_idx] <= out[feature_store_idx][output_store_idx];
+                    end
+                end
+                state <= SAVE;
+            end
+        end
+
+        SAVE: begin
+            mismatch_count = 0;
+            compare_count = 0;
+            for (int feature_cmp_idx = 0; feature_cmp_idx < NUM_FEATURES; feature_cmp_idx++) begin
+                for (int output_cmp_idx = 0; output_cmp_idx < M; output_cmp_idx++) begin
+                    compare_count = compare_count + 1;
+                    if (latched_out[feature_cmp_idx][output_cmp_idx] !== truth[index - 1][feature_cmp_idx][output_cmp_idx]) begin
+                        mismatch_count = mismatch_count + 1;
+                        $display(
+                            "MISMATCH example=%0d feature=%0d out=%0d sim=%0d truth=%0d",
+                            index - 1,
+                            feature_cmp_idx,
+                            output_cmp_idx,
+                            latched_out[feature_cmp_idx][output_cmp_idx],
+                            truth[index - 1][feature_cmp_idx][output_cmp_idx]
+                        );
+                    end
+                end
+            end
+
+            filename = OUTPUT_FILE;
+            file = $fopen(filename, "w");
+            if (file) begin
+                for (int feature_idx = 0; feature_idx < NUM_FEATURES; feature_idx++) begin
+                    for (int output_idx = 0; output_idx < M; output_idx++) begin
+                        $fwrite(file, "%0d\n", latched_out[feature_idx][output_idx]);
+                    end
+                end
+                $fclose(file);
+                $display(
+                    "Saved example %0d to %s (%0d/%0d matched)",
+                    index - 1,
+                    filename,
+                    compare_count - mismatch_count,
+                    compare_count
+                );
+            end else begin
+                $display("ERROR: Could not open file %s", filename);
+            end
+            state <= LOAD;
+        end
+
+        FINISHED: begin
+            $finish;
+        end
+    endcase
 end
 
 endmodule

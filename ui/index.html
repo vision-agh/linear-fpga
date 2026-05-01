@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Digit Classifier Simulator</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <p class="eyebrow">Verilog Classification UI</p>
+      <h1>Draw a digit and run the simulation</h1>
+      <p class="lede">
+        Draw a single digit, run the hardware simulation, and read back the class predicted by the RTL model.
+      </p>
+    </section>
+
+    <section class="panel grid">
+      <div class="card draw-card">
+        <div class="card-head">
+          <h2>28x28 Input Grid</h2>
+          <div class="actions">
+            <button id="clear-btn" type="button">Clear</button>
+            <button id="simulate-btn" type="button" class="primary">Classify</button>
+          </div>
+        </div>
+        <div id="draw-grid" class="draw-grid" aria-label="28 by 28 digit grid"></div>
+        <div class="hint-row">
+          <span>Drag to paint white cells. Right click to erase.</span>
+          <span id="status">Idle.</span>
+        </div>
+        <div class="backend-row">
+          <label for="backend-select">Backend</label>
+          <select id="backend-select">
+            <option value="verilog">Verilog simulation</option>
+            <option value="python">Python reference</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card result-card">
+        <div class="card-head">
+          <h2>Result</h2>
+          <button id="self-test-btn" type="button">Check Runtime</button>
+        </div>
+        <div class="prediction-box">
+          <span class="prediction-label">Predicted digit</span>
+          <strong id="prediction" class="prediction-value">-</strong>
+          <span id="backend-badge" class="backend-badge">verilog</span>
+        </div>
+        <div class="result-pill">
+          <span>Cycles</span>
+          <strong id="cycles">-</strong>
+        </div>
+        <div class="logits">
+          <h3>Logits</h3>
+          <div id="logits-list" class="logits-list"></div>
+        </div>
+        <div class="files">
+          <h3>Simulation files</h3>
+          <pre id="files-box">No simulation yet.</pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel grid">
+      <div class="card">
+        <h2>Layer Config</h2>
+        <div id="layer-config" class="layer-config"></div>
+        <div class="config-actions">
+          <button id="save-config-btn" type="button">Save Config</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Runtime Check</h2>
+        <pre id="audit-box">Loading audit...</pre>
+      </div>
+    </section>
+
+    <section class="panel grid">
+      <div class="card">
+        <h2>Current Config</h2>
+        <pre id="config-box">Loading config...</pre>
+      </div>
+      <div class="card">
+        <h2>Notes</h2>
+        <pre id="notes-box">Use Verilog backend to watch cycle changes after saving layer parameters.</pre>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

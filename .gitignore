@@ -1,8 +1,46 @@
+# OS / editor
+.DS_Store
+Thumbs.db
 .nvim/
-venv/
+.vs/
+
+# Python environments and caches
 .venv/
+venv/
 env/
-*.txt
-!requirements.txt
-!params.txt
-!README_memory_data_formatting.txt
+model/venv/
+SW/venv/
+__pycache__/
+*/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local datasets / scratch
+data/
+tmp/
+
+# Local simulation outputs
+*.vvp
+*.vcd
+*.fst
+*.log
+output_example_1.bin
+HW/output_example_1.bin
+
+# Local tool installs / downloads
+tools/oss-cad-suite/
+tools/oss-cad-suite-windows-x64-*.exe
+
+# Generated hardware/model artifacts
+HW/generated/
+HW/quick_tests/*.mem
+HW/quick_tests/*.txt
+HW/quick_tests/*.json
+HW/quick_tests/*.png
+HW/quick_tests/weights_small.mem
+
+# Local SW outputs
+SW/*OUTPUT_dequant.txt
+SW/*OUTPUT_quantized.txt
+SW/*data.txt

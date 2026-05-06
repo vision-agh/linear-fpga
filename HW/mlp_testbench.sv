@@ -3,7 +3,7 @@
 module mlp_testbench;
 
 `include "generated/mlp_params.svh"
-`include "generated/runtime/mlp_runtime_overrides.svh"
+`include "mlp_runtime_overrides.svh"
 
 `ifndef MLP_NUM_FEATURES
 `define MLP_NUM_FEATURES 2
@@ -31,6 +31,10 @@ module mlp_testbench;
 
 `ifndef MLP_FC3_MPF
 `define MLP_FC3_MPF 8
+`endif
+
+`ifndef MLP_CHECK_INTERMEDIATES
+`define MLP_CHECK_INTERMEDIATES 0
 `endif
 
 `ifndef MLP_FC1_WEIGHTS_FILE
@@ -237,35 +241,37 @@ module mlp_testbench;
         #1;
 
         mismatch_count = 0;
-        for (int feature_idx = 0; feature_idx < NUM_FEATURES; feature_idx++) begin
-            for (int output_idx = 0; output_idx < FC1_M; output_idx++) begin
-                if (dut.fc1_out_reg[feature_idx][output_idx] !== fc1_truth[feature_idx][output_idx]) begin
-                    mismatch_count = mismatch_count + 1;
-                    if (mismatch_count <= 12) begin
-                        $display("FC1 mismatch feature=%0d out=%0d sim=%0d truth=%0d", feature_idx, output_idx, dut.fc1_out_reg[feature_idx][output_idx], fc1_truth[feature_idx][output_idx]);
+        if (`MLP_CHECK_INTERMEDIATES) begin
+            for (int feature_idx = 0; feature_idx < NUM_FEATURES; feature_idx++) begin
+                for (int output_idx = 0; output_idx < FC1_M; output_idx++) begin
+                    if (dut.fc1_out[feature_idx][output_idx] !== fc1_truth[feature_idx][output_idx]) begin
+                        mismatch_count = mismatch_count + 1;
+                        if (mismatch_count <= 12) begin
+                            $display("FC1 mismatch feature=%0d out=%0d sim=%0d truth=%0d", feature_idx, output_idx, dut.fc1_out[feature_idx][output_idx], fc1_truth[feature_idx][output_idx]);
+                        end
                     end
-                end
-                if (dut.relu1_reg[feature_idx][output_idx] !== relu1_truth[feature_idx][output_idx]) begin
-                    mismatch_count = mismatch_count + 1;
-                    if (mismatch_count <= 12) begin
-                        $display("RELU1 mismatch feature=%0d out=%0d sim=%0d truth=%0d", feature_idx, output_idx, dut.relu1_reg[feature_idx][output_idx], relu1_truth[feature_idx][output_idx]);
+                    if (dut.relu1_reg[feature_idx][output_idx] !== relu1_truth[feature_idx][output_idx]) begin
+                        mismatch_count = mismatch_count + 1;
+                        if (mismatch_count <= 12) begin
+                            $display("RELU1 mismatch feature=%0d out=%0d sim=%0d truth=%0d", feature_idx, output_idx, dut.relu1_reg[feature_idx][output_idx], relu1_truth[feature_idx][output_idx]);
+                        end
                     end
                 end
             end
-        end
 
-        for (int feature_idx = 0; feature_idx < NUM_FEATURES; feature_idx++) begin
-            for (int output_idx = 0; output_idx < FC2_M; output_idx++) begin
-                if (dut.fc2_out_reg[feature_idx][output_idx] !== fc2_truth[feature_idx][output_idx]) begin
-                    mismatch_count = mismatch_count + 1;
-                    if (mismatch_count <= 12) begin
-                        $display("FC2 mismatch feature=%0d out=%0d sim=%0d truth=%0d", feature_idx, output_idx, dut.fc2_out_reg[feature_idx][output_idx], fc2_truth[feature_idx][output_idx]);
+            for (int feature_idx = 0; feature_idx < NUM_FEATURES; feature_idx++) begin
+                for (int output_idx = 0; output_idx < FC2_M; output_idx++) begin
+                    if (dut.fc2_out[feature_idx][output_idx] !== fc2_truth[feature_idx][output_idx]) begin
+                        mismatch_count = mismatch_count + 1;
+                        if (mismatch_count <= 12) begin
+                            $display("FC2 mismatch feature=%0d out=%0d sim=%0d truth=%0d", feature_idx, output_idx, dut.fc2_out[feature_idx][output_idx], fc2_truth[feature_idx][output_idx]);
+                        end
                     end
-                end
-                if (dut.relu2_reg[feature_idx][output_idx] !== relu2_truth[feature_idx][output_idx]) begin
-                    mismatch_count = mismatch_count + 1;
-                    if (mismatch_count <= 12) begin
-                        $display("RELU2 mismatch feature=%0d out=%0d sim=%0d truth=%0d", feature_idx, output_idx, dut.relu2_reg[feature_idx][output_idx], relu2_truth[feature_idx][output_idx]);
+                    if (dut.relu2_reg[feature_idx][output_idx] !== relu2_truth[feature_idx][output_idx]) begin
+                        mismatch_count = mismatch_count + 1;
+                        if (mismatch_count <= 12) begin
+                            $display("RELU2 mismatch feature=%0d out=%0d sim=%0d truth=%0d", feature_idx, output_idx, dut.relu2_reg[feature_idx][output_idx], relu2_truth[feature_idx][output_idx]);
+                        end
                     end
                 end
             end

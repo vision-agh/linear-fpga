@@ -1,97 +1,88 @@
 `timescale 1ns / 1ps
+
 module serial_accumulator #(
-    parameter int PRECISION              = 64,
-    parameter int TEMP                   = 2,
-    parameter int INITIAL_LATENCY        = 4,
-    parameter int NUM_FEATURES           = 1, // number of parallel features
-    parameter int M                      = 6
+    parameter int PRECISION    = 64,
+    parameter int NUM_FEATURES = 1,
+    parameter int M            = 6
 ) (
-    input  logic                      clk,
-    input  logic                      rst,
-    input  logic                      clr,
-    input  logic                      ce,     
-    input  logic signed [PRECISION-1:0] features [NUM_FEATURES-1:0],
-    output logic signed [PRECISION-1:0] out      [NUM_FEATURES-1:0][M-1:0],
-    output logic                      acc_done    
+    input  logic                                   clk,
+    input  logic                                   rst,
+    input  logic                                   clr,
+    input  logic                                   ce,
+    input  logic                                   value_valid,
+    input  logic                                   value_first,
+    input  logic                                   value_last,
+    input  logic [$clog2(M)-1:0]                   value_index,
+    input  logic signed [PRECISION-1:0]            features [NUM_FEATURES-1:0],
+    output logic                                   out_valid,
+    output logic                                   layer_done,
+    output logic [$clog2(M)-1:0]                   out_index,
+    output logic signed [PRECISION-1:0]            out_features [NUM_FEATURES-1:0]
 );
 
-    typedef enum logic [1:0] {
-        LATENCY,
-        ACCUMULATING,
-        IDLE
-    } state_t;
-    
-    state_t state = LATENCY;
+    logic signed [PRECISION-1:0] running_acc [NUM_FEATURES-1:0];
+    logic signed [PRECISION-1:0] next_running_acc [NUM_FEATURES-1:0];
+    logic signed [PRECISION-1:0] next_out_features [NUM_FEATURES-1:0];
+    logic next_out_valid;
+    logic next_layer_done;
+    logic [$clog2(M)-1:0] next_out_index;
 
-    localparam int LATENCY_LAST = (INITIAL_LATENCY > 1) ? (INITIAL_LATENCY - 2) : 0;
+    always_comb begin
+        next_out_valid = 1'b0;
+        next_layer_done = 1'b0;
+        next_out_index = out_index;
 
-    logic [$clog2(INITIAL_LATENCY):0] count = 0;
-    logic [$clog2(M)+1:0] bucket_count = 0;
-    logic [$clog2(TEMP):0] segment_count = 0;
-    logic signed [PRECISION-1:0] accumulator [NUM_FEATURES-1:0][M-1:0];
-    
+        for (int feature_idx = 0; feature_idx < NUM_FEATURES; feature_idx++) begin
+            next_running_acc[feature_idx] = running_acc[feature_idx];
+            next_out_features[feature_idx] = out_features[feature_idx];
+        end
+
+        if (value_valid) begin
+            next_out_index = value_index;
+            for (int feature_idx = 0; feature_idx < NUM_FEATURES; feature_idx++) begin
+                if (value_first) begin
+                    next_running_acc[feature_idx] = features[feature_idx];
+                end else begin
+                    next_running_acc[feature_idx] = running_acc[feature_idx] + features[feature_idx];
+                end
+
+                if (value_last) begin
+                    next_out_features[feature_idx] = next_running_acc[feature_idx];
+                end
+            end
+
+            if (value_last) begin
+                next_out_valid = 1'b1;
+                next_layer_done = (value_index == M - 1);
+            end
+        end
+    end
+
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
-            count         <= 0;
-            bucket_count  <= 0;
-            segment_count <= 0;
-            for (int reset_feature_idx = 0; reset_feature_idx < NUM_FEATURES; reset_feature_idx++) begin
-                for (int reset_bucket_idx = 0; reset_bucket_idx < M; reset_bucket_idx++) begin
-                    accumulator[reset_feature_idx][reset_bucket_idx] <= '0;
-                end
+            out_valid <= 1'b0;
+            layer_done <= 1'b0;
+            out_index <= '0;
+            for (int feature_idx = 0; feature_idx < NUM_FEATURES; feature_idx++) begin
+                running_acc[feature_idx] <= '0;
+                out_features[feature_idx] <= '0;
             end
-            state         <= LATENCY;
-            acc_done      <= 0;
-        end  else if (clr) begin
-            count         <= 0;
-            bucket_count  <= 0;
-            segment_count <= 0;
-            for (int clr_feature_idx = 0; clr_feature_idx < NUM_FEATURES; clr_feature_idx++) begin
-                for (int clr_bucket_idx = 0; clr_bucket_idx < M; clr_bucket_idx++) begin
-                    accumulator[clr_feature_idx][clr_bucket_idx] <= '0;
-                end
+        end else if (clr) begin
+            out_valid <= 1'b0;
+            layer_done <= 1'b0;
+            out_index <= '0;
+            for (int feature_idx = 0; feature_idx < NUM_FEATURES; feature_idx++) begin
+                running_acc[feature_idx] <= '0;
+                out_features[feature_idx] <= '0;
             end
-            state         <= LATENCY;
-            acc_done      <= 0;
-        end else begin
-            if (ce) begin
-                 case (state)
-                    LATENCY: begin
-                        if (count < LATENCY_LAST) begin
-                            state <= LATENCY;
-                            count <= count + 1;  
-                        end else begin
-                            state <= ACCUMULATING;
-                            count <= 0;
-                        end
-                    end
-                    ACCUMULATING: begin
-                        state <= ACCUMULATING;
-                        for(int i=0; i<NUM_FEATURES; i++) begin
-                            accumulator[i][bucket_count] += features[i];
-                        end
-                        if(bucket_count < M-1)
-                            bucket_count <= bucket_count + 1;
-                        else begin
-                            if(segment_count == TEMP-1) begin
-                                for(int i=0; i<NUM_FEATURES; i++) begin
-                                    for(int j=0; j<M; j++) begin
-                                        out[i][j] <= accumulator[i][j];
-                                    end
-                                end
-                                state <= IDLE;
-                                acc_done <= 1;
-                            end else begin
-                                bucket_count <= 0;
-                                segment_count <= segment_count+1;
-                            end
-                        end
-                    end
-                    IDLE: begin
-                        acc_done <= 0;
-                    end
-                 endcase
-            end 
+        end else if (ce) begin
+            out_valid <= next_out_valid;
+            layer_done <= next_layer_done;
+            out_index <= next_out_index;
+            for (int feature_idx = 0; feature_idx < NUM_FEATURES; feature_idx++) begin
+                running_acc[feature_idx] <= next_running_acc[feature_idx];
+                out_features[feature_idx] <= next_out_features[feature_idx];
+            end
         end
     end
 

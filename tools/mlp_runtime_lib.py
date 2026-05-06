@@ -81,6 +81,13 @@ def _to_hex_twos(value: int, bits: int) -> str:
     return f"{value & mask:0{width}x}"
 
 
+def _write_mem(path: Path, values: np.ndarray, bits: int) -> Path:
+    flat = np.asarray(values).reshape(-1)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(_to_hex_twos(int(v), bits) for v in flat) + "\n", encoding="utf-8")
+    return path
+
+
 def _read_weight_rows(layer_name: str) -> list[list[int]]:
     path = GENERATED_DIR / f"{layer_name}_weights_raw.txt"
     rows = []
@@ -146,7 +153,7 @@ def prepare_runtime_weights(config: dict[str, Any], runtime_dir: Path | None = N
 
 
 def relative_to_hw(path: Path) -> str:
-    return path.relative_to(HW_DIR).as_posix()
+    return os.path.relpath(path, HW_DIR).replace("\\", "/")
 
 
 def write_runtime_override_file(path: Path, macros: dict[str, str]) -> Path:
@@ -154,6 +161,31 @@ def write_runtime_override_file(path: Path, macros: dict[str, str]) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path
+
+
+def generate_synthetic_mlp_case(runtime_root: Path, num_features: int = 2, seed: int = 12345) -> dict[str, Path]:
+    loader = get_loader()
+    rng = np.random.default_rng(seed)
+    raw = rng.integers(0, 256, size=(num_features, loader.layers[0].input_size), dtype=np.int32)
+    traces = [loader.run_integer_trace(raw[i]) for i in range(num_features)]
+
+    img_quantized = np.stack([np.asarray(trace["img_quantized"]).reshape(-1) for trace in traces], axis=0)
+    fc1_out = np.stack([np.asarray(trace["fc1_out"]).reshape(-1) for trace in traces], axis=0)
+    relu1_out = np.stack([np.asarray(trace["relu1_out"]).reshape(-1) for trace in traces], axis=0)
+    fc2_out = np.stack([np.asarray(trace["fc2_out"]).reshape(-1) for trace in traces], axis=0)
+    relu2_out = np.stack([np.asarray(trace["relu2_out"]).reshape(-1) for trace in traces], axis=0)
+    fc3_out = np.stack([np.asarray(trace["fc3_out"]).reshape(-1) for trace in traces], axis=0)
+
+    files = {
+        "MLP_INPUT_FILE": _write_mem(runtime_root / "mlp_test_input.mem", img_quantized, loader.layers[0].input_bits),
+        "MLP_FC1_TRUTH_FILE": _write_mem(runtime_root / "mlp_test_fc1_truth.mem", fc1_out, loader.layers[0].output_bits),
+        "MLP_RELU1_TRUTH_FILE": _write_mem(runtime_root / "mlp_test_relu1_truth.mem", relu1_out, loader.layers[0].output_bits),
+        "MLP_FC2_TRUTH_FILE": _write_mem(runtime_root / "mlp_test_fc2_truth.mem", fc2_out, loader.layers[1].output_bits),
+        "MLP_RELU2_TRUTH_FILE": _write_mem(runtime_root / "mlp_test_relu2_truth.mem", relu2_out, loader.layers[1].output_bits),
+        "MLP_FC3_TRUTH_FILE": _write_mem(runtime_root / "mlp_test_fc3_truth.mem", fc3_out, loader.layers[2].output_bits),
+        "MLP_OUTPUT_FILE": runtime_root / "mlp_sim_output.txt",
+    }
+    return files
 
 
 def _macro_args_for_config(config: dict[str, Any], weights: dict[str, Path], extra_macros: dict[str, str] | None = None) -> list[str]:
@@ -182,14 +214,14 @@ def _parse_metric(stdout: str, prefix: str) -> dict[str, int]:
 def run_mlp_testbench(config: dict[str, Any], runtime_dir: Path | None = None) -> dict[str, Any]:
     runtime_root = runtime_dir or (REPO_ROOT / config["runtime_dir"])
     weights = prepare_runtime_weights(config, runtime_root)
-    write_runtime_override_file(
-        runtime_root / "mlp_runtime_overrides.svh",
-        {
-            "MLP_FC1_WEIGHTS_FILE": f"\"{relative_to_hw(weights['fc1'])}\"",
-            "MLP_FC2_WEIGHTS_FILE": f"\"{relative_to_hw(weights['fc2'])}\"",
-            "MLP_FC3_WEIGHTS_FILE": f"\"{relative_to_hw(weights['fc3'])}\"",
-        },
-    )
+    synthetic_files = generate_synthetic_mlp_case(runtime_root, num_features=2)
+    override_macros = {
+        "MLP_FC1_WEIGHTS_FILE": f"\"{relative_to_hw(weights['fc1'])}\"",
+        "MLP_FC2_WEIGHTS_FILE": f"\"{relative_to_hw(weights['fc2'])}\"",
+        "MLP_FC3_WEIGHTS_FILE": f"\"{relative_to_hw(weights['fc3'])}\"",
+        **{name: f"\"{relative_to_hw(path)}\"" for name, path in synthetic_files.items()},
+    }
+    write_runtime_override_file(runtime_root / "mlp_runtime_overrides.svh", override_macros)
     tmp_dir = REPO_ROOT / "tmp" / "mlp_runtime"
     tmp_dir.mkdir(parents=True, exist_ok=True)
     out_vvp = tmp_dir / "mlp_config_testbench.vvp"
@@ -198,6 +230,8 @@ def run_mlp_testbench(config: dict[str, Any], runtime_dir: Path | None = None) -
         "-g2012",
         "-I",
         str(HW_DIR),
+        "-I",
+        str(runtime_root),
         "-o",
         str(out_vvp),
         *_macro_args_for_config(config, weights),
@@ -294,7 +328,6 @@ def run_ui_simulation(config: dict[str, Any], pixels: list[int] | list[list[int]
             "UI_FC3_WEIGHTS_FILE": f"\"{relative_to_hw(weights['fc3'])}\"",
         },
     )
-
     ui_macros = {
         "UI_FC1_TEMP": str(int(config["layers"]["fc1"]["temp"])),
         "UI_FC2_TEMP": str(int(config["layers"]["fc2"]["temp"])),
@@ -307,6 +340,8 @@ def run_ui_simulation(config: dict[str, Any], pixels: list[int] | list[list[int]
         "-g2012",
         "-I",
         str(HW_DIR),
+        "-I",
+        str(runtime_root),
         "-o",
         str(out_vvp),
         *[f"-D{key}={value}" for key, value in ui_macros.items()],

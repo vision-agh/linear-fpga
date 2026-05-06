@@ -1,0 +1,128 @@
+cat > /home/petalinux/mlp_server.py << 'PYEOF'
+import socket
+import struct
+import mmap
+import os
+import time
+
+DEVICE_MEM    = '/dev/mem'
+MLP_BASE_ADDR = 0x80020000
+AXI_MAP_SIZE  = 0x10000
+
+REG_CONTROL = 0x00
+REG_STATUS  = 0x04
+REG_INPUT   = 0x08
+REG_OUTPUT  = 0xC50
+
+def open_axi():
+    fd = os.open(DEVICE_MEM, os.O_RDWR | os.O_SYNC)
+    mem = mmap.mmap(fd, AXI_MAP_SIZE,
+                    mmap.MAP_SHARED,
+                    mmap.PROT_READ | mmap.PROT_WRITE,
+                    offset=MLP_BASE_ADDR)
+    return fd, mem
+
+def write_reg(mem, offset, value):
+    mem.seek(offset)
+    mem.write(struct.pack('I', value))
+
+def read_reg(mem, offset):
+    mem.seek(offset)
+    return struct.unpack('I', mem.read(4))[0]
+
+def pl_inference(mem, vector):
+    write_reg(mem, REG_CONTROL, 0)
+    time.sleep(0.001)
+
+    t_write_start = time.time()
+    for i, val in enumerate(vector):
+        uint8_val = int(val * 255) & 0xFF
+        write_reg(mem, REG_INPUT + i * 4, uint8_val)
+    t_write_end = time.time()
+
+    write_reg(mem, REG_CONTROL, 1)
+    t_trigger = time.time()
+
+    timeout = 5.0
+    while True:
+        status = read_reg(mem, REG_STATUS)
+        if status & 0x1:
+            break
+        if time.time() - t_trigger > timeout:
+            print('ERROR: PL inference timeout!')
+            return None, {}, 0
+        time.sleep(0.00001)
+
+    t_done = time.time()
+
+    output_vector = []
+    for i in range(10):
+        raw = read_reg(mem, REG_OUTPUT + i * 4)
+        uint8_val = raw & 0xFF
+        output_vector.append(float(uint8_val))
+
+    write_reg(mem, REG_CONTROL, 0)
+
+    timing = {
+        'write_ms':     (t_write_end - t_write_start) * 1000,
+        'inference_ms': (t_done - t_trigger) * 1000,
+        'total_axi_ms': (t_done - t_write_start) * 1000,
+    }
+    return output_vector, timing, 0
+
+def main():
+    PORT = 5000
+    print('Opening AXI interface...')
+    fd, mem = open_axi()
+    print('AXI mapped at 0x80020000')
+
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind(('0.0.0.0', PORT))
+    server.listen(1)
+    print('Waiting for PC on port 5000...')
+
+    while True:
+        conn, addr = server.accept()
+        print('PC connected from ' + str(addr))
+        img_count = 0
+        try:
+            while True:
+                data = b''
+                while len(data) < 3136:
+                    chunk = conn.recv(3136 - len(data))
+                    if not chunk:
+                        raise ConnectionError('PC disconnected')
+                    data += chunk
+
+                vector = struct.unpack('784f', data)
+                img_count += 1
+                t_total_start = time.time()
+
+                output_vector, timing, axi_errors = pl_inference(mem, vector)
+
+                if output_vector is None:
+                    output_vector = [0.0] * 10
+
+                t_total = (time.time() - t_total_start) * 1000
+                predicted = output_vector.index(max(output_vector))
+
+                print('[' + str(img_count) + '] predicted=' + str(predicted) +
+                      ' write=' + str(round(timing['write_ms'],2)) + 'ms' +
+                      ' infer=' + str(round(timing['inference_ms'],2)) + 'ms' +
+                      ' total=' + str(round(t_total,2)) + 'ms' +
+                      ' out=' + str([int(x) for x in output_vector]))
+
+                conn.sendall(struct.pack('10f', *output_vector))
+
+        except ConnectionError as e:
+            print('Connection closed: ' + str(e))
+        except Exception as e:
+            print('Error: ' + str(e))
+        finally:
+            conn.close()
+            print('Waiting for next connection...')
+
+if __name__ == '__main__':
+    main()
+PYEOF

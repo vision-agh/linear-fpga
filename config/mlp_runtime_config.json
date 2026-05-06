@@ -8,15 +8,15 @@
   },
   "layers": {
     "fc1": {
-      "temp": -8,
-      "mul_per_feature": 16
+      "temp": -2,
+      "mul_per_feature": 8
     },
     "fc2": {
-      "temp": -8,
+      "temp": 1,
       "mul_per_feature": 4
     },
     "fc3": {
-      "temp": -8,
+      "temp": 1,
       "mul_per_feature": 4
     }
   },

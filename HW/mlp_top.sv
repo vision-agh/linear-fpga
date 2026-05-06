@@ -77,7 +77,6 @@ module mlp_top #(
     logic fc1_out_valid;
     logic fc1_out_ready;
     logic [FC1_OUTPUT_PRECISION-1:0] fc1_out [NUM_FEATURES-1:0][FC1_M-1:0];
-    logic [FC1_OUTPUT_PRECISION-1:0] fc1_out_reg [NUM_FEATURES-1:0][FC1_M-1:0];
     logic [FC1_OUTPUT_PRECISION-1:0] relu1_wire [NUM_FEATURES-1:0][FC1_M-1:0];
     logic [FC1_OUTPUT_PRECISION-1:0] relu1_reg [NUM_FEATURES-1:0][FC1_M-1:0];
 
@@ -86,7 +85,6 @@ module mlp_top #(
     logic fc2_out_valid;
     logic fc2_out_ready;
     logic [FC2_OUTPUT_PRECISION-1:0] fc2_out [NUM_FEATURES-1:0][FC2_M-1:0];
-    logic [FC2_OUTPUT_PRECISION-1:0] fc2_out_reg [NUM_FEATURES-1:0][FC2_M-1:0];
     logic [FC2_OUTPUT_PRECISION-1:0] relu2_wire [NUM_FEATURES-1:0][FC2_M-1:0];
     logic [FC2_OUTPUT_PRECISION-1:0] relu2_reg [NUM_FEATURES-1:0][FC2_M-1:0];
 
@@ -207,11 +205,9 @@ module mlp_top #(
             in_ready <= 1'b0;
             for (int feature_idx = 0; feature_idx < NUM_FEATURES; feature_idx++) begin
                 for (int fc1_idx = 0; fc1_idx < FC1_M; fc1_idx++) begin
-                    fc1_out_reg[feature_idx][fc1_idx] <= '0;
                     relu1_reg[feature_idx][fc1_idx] <= '0;
                 end
                 for (int fc2_idx = 0; fc2_idx < FC2_M; fc2_idx++) begin
-                    fc2_out_reg[feature_idx][fc2_idx] <= '0;
                     relu2_reg[feature_idx][fc2_idx] <= '0;
                 end
                 for (int fc3_idx = 0; fc3_idx < FC3_M; fc3_idx++) begin
@@ -239,7 +235,6 @@ module mlp_top #(
                     if (fc1_out_valid && fc1_out_ready) begin
                         for (int feature_idx = 0; feature_idx < NUM_FEATURES; feature_idx++) begin
                             for (int output_idx = 0; output_idx < FC1_M; output_idx++) begin
-                                fc1_out_reg[feature_idx][output_idx] <= fc1_out[feature_idx][output_idx];
                                 relu1_reg[feature_idx][output_idx] <= relu1_wire[feature_idx][output_idx];
                             end
                         end
@@ -257,7 +252,6 @@ module mlp_top #(
                     if (fc2_out_valid && fc2_out_ready) begin
                         for (int feature_idx = 0; feature_idx < NUM_FEATURES; feature_idx++) begin
                             for (int output_idx = 0; output_idx < FC2_M; output_idx++) begin
-                                fc2_out_reg[feature_idx][output_idx] <= fc2_out[feature_idx][output_idx];
                                 relu2_reg[feature_idx][output_idx] <= relu2_wire[feature_idx][output_idx];
                             end
                         end
